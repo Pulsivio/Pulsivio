@@ -1,0 +1,6 @@
+{
+  "name": "Pulsivio",
+  "description": "Pulsivio - Nowoczesny dziennik pomiarów ciśnienia krwi i tętna z dedykowanym trybem seniora, asystentem głosowym AI, automatyczną synchronizacją PC-telefon, wydrukiem A4 dla lekarza oraz pełnym dopasowaniem do ekranu każdego smartfona.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

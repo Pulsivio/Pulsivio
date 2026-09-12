@@ -1,0 +1,16 @@
+{
+  "TEST-123": {
+    "measurements": [
+      {
+        "id": "1",
+        "systolic": 120,
+        "diastolic": 80,
+        "pulse": 70
+      }
+    ],
+    "profile": {
+      "name": "Jan"
+    },
+    "lastUpdated": 1788954816669
+  }
+}
