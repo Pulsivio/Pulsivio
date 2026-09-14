@@ -940,7 +940,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
             <div className="flex items-center gap-2.5 text-right">
               <div className="h-10 w-10 rounded-xl overflow-hidden border border-slate-300 bg-slate-950 shrink-0">
                 <img
-                  src={currentAvatar || '/avatars/pulsivio_play_logo.jpg'}
+                  src={currentAvatar || '/avatars/pulsivio_official_brand.jpg'}
                   alt="Logo Pulsivio"
                   referrerPolicy="no-referrer"
                   className="h-full w-full object-cover"
