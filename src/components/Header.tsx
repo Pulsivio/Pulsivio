@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Mic, Smartphone, Settings, Stethoscope, Crown, QrCode, Cloud, RefreshCw, Sparkles, Compass } from 'lucide-react';
+import { Heart, Mic, Smartphone, Settings, Stethoscope, Crown, QrCode, Cloud, RefreshCw, Sparkles, Compass, Image as ImageIcon } from 'lucide-react';
 import { Language } from '../types';
 import { translations } from '../i18n';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   onOpenPro?: () => void;
   onOpenRunOnPhone?: () => void;
   onOpenLandingPage?: () => void;
+  onOpenSocialKit?: () => void;
   syncCode?: string;
   isSyncing?: boolean;
   currentAvatar?: string;
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPro,
   onOpenRunOnPhone,
   onOpenLandingPage,
+  onOpenSocialKit,
   syncCode,
   isSyncing,
   currentAvatar,
@@ -47,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Kliknij, aby zmienić awatar aplikacji"
           >
             <img
-              src={currentAvatar || '/pulsify_avatar.png'}
+              src={currentAvatar || '/avatars/pulsivio_official_brand.jpg'}
               alt="Pulsivio Logo"
               referrerPolicy="no-referrer"
               className="h-full w-full object-cover object-center"
@@ -95,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenDoctorShare}
               id="header-doctor-share-btn"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
               title={lang === 'pl' ? 'Udostępnij lekarzowi' : 'Share with doctor'}
             >
               <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -121,11 +123,25 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenLandingPage}
               id="header-landing-btn"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/90 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
               title={lang === 'pl' ? 'O projekcie i funkcjach (Prezentacja)' : 'About project'}
             >
               <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden lg:inline whitespace-nowrap">{lang === 'pl' ? 'O Pulsivio' : 'About'}</span>
+            </button>
+          )}
+
+          {/* Social Kit Quick Button */}
+          {onOpenSocialKit && (
+            <button
+              type="button"
+              onClick={onOpenSocialKit}
+              id="header-social-kit-btn"
+              className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/90 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-rose-800 hover:bg-rose-100 dark:border-rose-900/80 dark:bg-rose-950/60 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-all cursor-pointer shadow-2xs active:scale-95"
+              title="Grafiki na Facebook i Social Media (Avatar + Baner)"
+            >
+              <ImageIcon className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+              <span className="hidden xl:inline whitespace-nowrap">Grafiki FB</span>
             </button>
           )}
 
@@ -134,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={onOpenSettings}
             id="header-settings-btn"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-xs cursor-pointer transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 px-2 sm:px-2.5 py-1.5 text-xs sm:text-sm font-bold text-slate-800 hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-xs cursor-pointer transition-all active:scale-95"
             title={t.settingsTitle || 'Ustawienia'}
           >
             <Settings className="h-4 w-4 text-slate-600 dark:text-slate-300" />

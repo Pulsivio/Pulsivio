@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Crown,
@@ -20,20 +20,40 @@ interface PulsivioProModalProps {
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  isPro?: boolean;
+  onTogglePro?: (active: boolean, plan?: string) => void;
 }
 
 export const PulsivioProModal: React.FC<PulsivioProModalProps> = ({
   isOpen,
   onClose,
   lang,
+  isPro = false,
+  onTogglePro,
 }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
-  const [isTrialActivated, setIsTrialActivated] = useState<boolean>(false);
+  const [localActivated, setLocalActivated] = useState<boolean>(isPro);
+
+  useEffect(() => {
+    setLocalActivated(isPro);
+  }, [isPro]);
 
   if (!isOpen) return null;
 
+  const isTrialActivated = localActivated || isPro;
+
   const handleActivateTrial = () => {
-    setIsTrialActivated(true);
+    setLocalActivated(true);
+    if (onTogglePro) {
+      onTogglePro(true, billingCycle);
+    }
+  };
+
+  const handleDeactivate = () => {
+    setLocalActivated(false);
+    if (onTogglePro) {
+      onTogglePro(false);
+    }
   };
 
   const proFeatures = [
@@ -153,9 +173,9 @@ export const PulsivioProModal: React.FC<PulsivioProModalProps> = ({
                       : 'text-slate-600 hover:text-slate-900 dark:text-slate-400'
                   }`}
                 >
-                  {lang === 'pl' ? 'Rocznie (99 zł / rok)' : 'Yearly ($29.99 / yr)'}
-                  <span className="ml-1.5 rounded-md bg-white/30 px-1 py-0.5 text-[10px] font-bold text-white">
-                    -45%
+                  {lang === 'pl' ? 'Rocznie (79 zł / rok)' : 'Yearly ($24.99 / yr)'}
+                  <span className="ml-1 rounded-md bg-white/30 px-1 py-0.5 text-[9px] font-bold text-white">
+                    -55%
                   </span>
                 </button>
               </div>
@@ -224,29 +244,64 @@ export const PulsivioProModal: React.FC<PulsivioProModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 py-1">
+            <div className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 py-1 border-b border-slate-100 dark:border-slate-800/60">
               <span>{lang === 'pl' ? 'Oficjalny Raport PDF dla Lekarza' : 'Official PDF Doctor Report'}</span>
               <div className="flex items-center gap-8 pr-1 font-bold">
                 <span className="text-slate-400 text-xs">Podstawowy</span>
                 <span className="text-amber-600 dark:text-amber-400 font-extrabold">Zaawansowany</span>
               </div>
             </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 py-1 bg-amber-50/50 dark:bg-amber-950/20 px-2 rounded-lg">
+              <span className="font-bold text-amber-900 dark:text-amber-200">
+                {lang === 'pl' ? 'Reklamy' : 'Ads'}
+              </span>
+              <div className="flex items-center gap-6 pr-1 font-bold">
+                <span className="text-slate-400 text-[11px]">{lang === 'pl' ? 'Włączone' : 'Enabled'}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center gap-1">
+                  <Check className="h-3.5 w-3.5" />
+                  {lang === 'pl' ? 'Wyłączone' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Reassurance note about history retention after PRO expires */}
+          <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/40 p-3 flex items-start gap-2.5 text-blue-900 dark:text-blue-200">
+            <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed text-[11px] sm:text-xs">
+              <strong>{lang === 'pl' ? 'Gwarancja zachowania historii:' : 'Data Preservation Guarantee:'}</strong>{' '}
+              {lang === 'pl'
+                ? 'Nawet jeśli Twoja subskrypcja PRO wygaśnie lub z niej zrezygnujesz, wszystkie dotychczas wprowadzone pomiary, cała historia, wykresy i wygenerowane raporty pozostają w 100% nienaruszone i bezpłatnie dostępne w Twoim dzienniku na zawsze. Żadne dane zdrowotne nie zostaną skasowane ani zablokowane.'
+                : 'Even if your PRO subscription expires or is cancelled, all your measurements, history, charts, and generated reports remain 100% intact and freely accessible in your diary forever. No health data is ever deleted or locked.'}
+            </p>
           </div>
 
         </div>
 
         {/* Modal Action Footer */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            <span>{lang === 'pl' ? 'Gwarancja rezygnacji w każdej chwili' : 'Cancel anytime with 1 click'}</span>
+            <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+            <span className="text-[11px] sm:text-xs">{lang === 'pl' ? 'Możliwość rezygnacji w każdej chwili' : 'Cancel anytime'}</span>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {isTrialActivated && (
+              <button
+                type="button"
+                onClick={handleDeactivate}
+                className="flex-1 sm:flex-none rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-900 px-3 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 cursor-pointer text-center"
+                title={lang === 'pl' ? 'Przetestuj wersję zwykłą z reklamami' : 'Test free ad-supported version'}
+              >
+                {lang === 'pl' ? 'Wyłącz PRO' : 'Deactivate'}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white dark:bg-slate-700 dark:border-slate-600 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 cursor-pointer"
+              className="flex-1 sm:flex-none rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer text-center"
             >
               {lang === 'pl' ? 'Zamknij' : 'Close'}
             </button>
@@ -255,19 +310,19 @@ export const PulsivioProModal: React.FC<PulsivioProModalProps> = ({
               <button
                 type="button"
                 onClick={handleActivateTrial}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/25 hover:from-amber-400 hover:to-rose-400 cursor-pointer transition-all active:scale-95"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/25 hover:from-amber-400 hover:to-rose-400 cursor-pointer transition-all active:scale-95 text-center whitespace-nowrap"
               >
-                <Zap className="h-4 w-4" />
-                <span>{lang === 'pl' ? 'Aktywuj darmowy okres Beta PRO' : 'Activate Free Beta PRO'}</span>
+                <Zap className="h-3.5 w-3.5 shrink-0" />
+                <span>{lang === 'pl' ? 'Aktywuj Pakiet PRO' : 'Activate PRO'}</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 cursor-pointer transition-all"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-500 cursor-pointer transition-all text-center whitespace-nowrap"
               >
-                <Check className="h-4 w-4" />
-                <span>{lang === 'pl' ? 'Gotowe • Korzystaj z PRO' : 'Done • Enjoy PRO'}</span>
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>{lang === 'pl' ? 'PRO Aktywne' : 'PRO Active'}</span>
               </button>
             )}
           </div>

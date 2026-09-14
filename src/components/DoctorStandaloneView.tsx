@@ -444,7 +444,7 @@ export const DoctorStandaloneView: React.FC<DoctorStandaloneViewProps> = ({
                 type="button"
                 onClick={onRefresh}
                 disabled={isSyncing}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                 title="Odśwież najświeższe dane z telefonu pacjenta"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin text-blue-600' : 'text-slate-600'}`} />
@@ -457,7 +457,7 @@ export const DoctorStandaloneView: React.FC<DoctorStandaloneViewProps> = ({
                 type="button"
                 onClick={onToggleDarkMode}
                 id="doctor-theme-toggle-btn"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer"
                 title={isDarkMode ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny'}
               >
                 {isDarkMode ? <Sun className="h-3.5 w-3.5 text-amber-500" /> : <Moon className="h-3.5 w-3.5 text-slate-700" />}

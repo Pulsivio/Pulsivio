@@ -52,8 +52,8 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
       </nav>
 
-      {/* Sticky Mobile Bottom Bar (Thumb-accessible for smartphones) */}
-      <div className="no-print sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-1.5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
+      {/* Sticky Mobile Bottom Bar (Thumb-accessible for smartphones with safe-area insets) */}
+      <div className="no-print sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0.5rem))] backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
         <div className="grid grid-cols-5 gap-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;

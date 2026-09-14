@@ -10,6 +10,29 @@ const STORAGE_KEY_SYNC_CODE = 'pulsivio_sync_code_v1';
 const STORAGE_KEY_SYNC_TIMESTAMP = 'pulsivio_sync_ts_v1';
 const STORAGE_KEY_AVATAR = 'pulsivio_avatar_v1';
 const STORAGE_KEY_DARK_MODE = 'pulsivio_dark_mode_v2';
+const STORAGE_KEY_PRO = 'pulsivio_pro_status_v1';
+
+export interface ProStatus {
+  isPro: boolean;
+  plan?: 'monthly' | 'yearly' | 'lifetime' | 'beta';
+  activatedAt?: number;
+}
+
+export function getStoredProStatus(): ProStatus {
+  if (typeof window === 'undefined') return { isPro: false };
+  const raw = localStorage.getItem(STORAGE_KEY_PRO);
+  if (!raw) return { isPro: false };
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { isPro: false };
+  }
+}
+
+export function setStoredProStatus(status: ProStatus): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_PRO, JSON.stringify(status));
+}
 
 export function getStoredDarkMode(): boolean {
   if (typeof window === 'undefined') return true;
@@ -24,10 +47,10 @@ export function setStoredDarkMode(enabled: boolean): void {
 }
 
 export function getStoredAvatar(): string {
-  if (typeof window === 'undefined') return '/avatars/original_pulsify.png';
+  if (typeof window === 'undefined') return '/avatars/pulsivio_official_brand.jpg';
   const saved = localStorage.getItem(STORAGE_KEY_AVATAR);
-  if (!saved || saved.includes('pulsivio_') || saved.includes('mascot_') || saved.includes('cardio_')) {
-    return '/avatars/original_pulsify.png';
+  if (!saved || saved.includes('original_pulsify') || saved.includes('pulsify_avatar')) {
+    return '/avatars/pulsivio_official_brand.jpg';
   }
   return saved;
 }
@@ -287,3 +310,57 @@ function generateSampleMeasurements(): Measurement[] {
 
   return samples;
 }
+
+const STORAGE_KEY_AFFILIATE_TAG = 'pulsivio_affiliate_tag';
+const STORAGE_KEY_AFFILIATE_URLS = 'pulsivio_affiliate_urls';
+const STORAGE_KEY_ADMIN_UNLOCKED = 'pulsivio_admin_unlocked';
+const STORAGE_KEY_ADMIN_EMAIL = 'pulsivio_admin_email';
+
+export function getStoredAffiliateTag(): string {
+  if (typeof window === 'undefined') return '31212';
+  return localStorage.getItem(STORAGE_KEY_AFFILIATE_TAG) || '31212';
+}
+
+export function setStoredAffiliateTag(tag: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_AFFILIATE_TAG, tag.trim());
+}
+
+export function getStoredAffiliateUrls(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_AFFILIATE_URLS);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function setStoredAffiliateUrls(urls: Record<string, string>): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_AFFILIATE_URLS, JSON.stringify(urls));
+}
+
+export function getIsAdminUnlocked(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(STORAGE_KEY_ADMIN_UNLOCKED) === 'true';
+}
+
+export function setIsAdminUnlocked(unlocked: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_ADMIN_UNLOCKED, String(unlocked));
+}
+
+export const getIsAdmin = getIsAdminUnlocked;
+export const setIsAdmin = setIsAdminUnlocked;
+
+export function getStoredAdminEmail(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(STORAGE_KEY_ADMIN_EMAIL) || 'pirat123451@gmail.com';
+}
+
+export function setStoredAdminEmail(email: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY_ADMIN_EMAIL, email.trim());
+}
+

@@ -370,7 +370,7 @@ export const CaregiverModal: React.FC<CaregiverModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold text-sm hover:bg-slate-800 dark:hover:bg-slate-100 shadow-xs cursor-pointer transition-all active:scale-95"
+            className="px-6 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 dark:border dark:border-slate-700 text-white font-extrabold text-sm hover:bg-slate-800 dark:hover:bg-slate-700 shadow-xs cursor-pointer transition-all active:scale-95"
           >
             {lang === 'pl' ? 'Gotowe' : 'Done'}
           </button>

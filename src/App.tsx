@@ -19,6 +19,7 @@ import { AvatarSelectorModal } from './components/AvatarSelectorModal';
 import { EditMeasurementModal } from './components/EditMeasurementModal';
 import { DoctorStandaloneView } from './components/DoctorStandaloneView';
 import { LandingPageModal } from './components/LandingPageModal';
+import { SocialMediaKitModal } from './components/SocialMediaKitModal';
 import { AdBanner } from './components/AdBanner';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { decodeDoctorData } from './utils/urlSharing';
@@ -45,6 +46,8 @@ import {
   setStoredAvatar,
   getStoredDarkMode,
   setStoredDarkMode,
+  getStoredProStatus,
+  setStoredProStatus,
 } from './utils/storage';
 import { Plus, Mic, Heart, Smartphone } from 'lucide-react';
 import { translations } from './i18n';
@@ -64,6 +67,18 @@ export default function App() {
     if (typeof window === 'undefined') return false;
     return window.location.hash.includes('doctor') || window.location.search.includes('doctor_code');
   });
+
+  // PRO Subscription status (removes AdSense ads & unlocks advanced reports)
+  const [isPro, setIsPro] = useState<boolean>(() => getStoredProStatus().isPro);
+
+  const handleTogglePro = (active: boolean, plan?: string) => {
+    setIsPro(active);
+    setStoredProStatus({
+      isPro: active,
+      plan: (plan as any) || 'yearly',
+      activatedAt: Date.now(),
+    });
+  };
 
   // Cross-device sync state (PC <-> Phone)
   const [syncCode, setSyncCode] = useState<string>(() => {
@@ -85,10 +100,40 @@ export default function App() {
   const [isProOpen, setIsProOpen] = useState<boolean>(false);
   const [isDevicesModalOpen, setIsDevicesModalOpen] = useState<boolean>(false);
   const [isLandingPageOpen, setIsLandingPageOpen] = useState<boolean>(false);
+  const [isSocialKitOpen, setIsSocialKitOpen] = useState<boolean>(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [avatar, setAvatar] = useState<string>(() => getStoredAvatar());
   const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState<boolean>(false);
   const [editingMeasurement, setEditingMeasurement] = useState<Measurement | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [showOnlineToast, setShowOnlineToast] = useState<boolean>(false);
+
+  // Online / Offline synchronization listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowOnlineToast(true);
+      setTimeout(() => setShowOnlineToast(false), 4000);
+      const code = getStoredSyncCode();
+      if (code) {
+        pullFromServer(code);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Sync theme with document element
   useEffect(() => {
@@ -162,9 +207,19 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.measurements && Array.isArray(data.measurements)) {
-          if (data.measurements.length > 0 || forceOverwrite) {
-            setMeasurements(data.measurements);
-            setStoredMeasurements(data.measurements);
+          if (data.measurements.length > 0) {
+            // Intelligent bidirectional merge: don't wipe local data, merge by ID!
+            setMeasurements((prev) => {
+              const map = new Map<string, Measurement>();
+              prev.forEach((m) => map.set(m.id, m));
+              data.measurements.forEach((m: Measurement) => map.set(m.id, m));
+              const merged = Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+              setStoredMeasurements(merged);
+              return merged;
+            });
+          } else if (measurements.length > 0) {
+            // If server room has no data, upload our local measurements
+            await pushToServer(code, measurements, profile);
           }
           if (data.profile && (data.profile.name || data.profile.birthYear)) {
             setProfile(data.profile);
@@ -344,6 +399,20 @@ export default function App() {
   const appContent = (
     <div className="w-full flex-1 flex flex-col pb-28 sm:pb-8 transition-colors">
       
+      {/* Offline Status Warning Bar */}
+      {!isOnline && (
+        <div className="bg-amber-500 text-slate-950 font-bold text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-xs">
+          <span>⚠️ Tryb offline: Brak połączenia z internetem. Twoje pomiary zapisują się bezpiecznie w pamięci telefonu.</span>
+        </div>
+      )}
+
+      {/* Online Back Toast */}
+      {showOnlineToast && (
+        <div className="bg-emerald-600 text-white font-bold text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-xs animate-fade-in">
+          <span>✅ Połączono z siecią: Twoje dane są zsynchronizowane.</span>
+        </div>
+      )}
+
       {/* PWA Mobile Install Banner - only shows when not running as installed app */}
       <PWAInstallBanner lang={lang} />
 
@@ -357,6 +426,7 @@ export default function App() {
         onOpenPro={() => setIsProOpen(true)}
         onOpenRunOnPhone={() => setIsRunOnPhoneOpen(true)}
         onOpenLandingPage={() => setIsLandingPageOpen(true)}
+        onOpenSocialKit={() => setIsSocialKitOpen(true)}
         syncCode={syncCode}
         isSyncing={isSyncing}
         currentAvatar={avatar}
@@ -395,7 +465,7 @@ export default function App() {
             lang={lang}
           />
 
-          <main className="flex-1 w-full animate-fade-in">
+          <main className="flex-1 w-full animate-fade-in pb-24 sm:pb-8">
             {activeTab === 'diary' && (
               <MeasurementsList
                 measurements={measurements}
@@ -444,12 +514,12 @@ export default function App() {
               />
             )}
 
-            {/* Dyskretny baner reklamowy Google AdSense - niewidoczny na wydrukach lekarskich */}
-            <AdBanner />
+            {/* Dyskretny baner reklamowy Google AdSense - w 100% wyłączony dla subskrybentów PRO */}
+            <AdBanner isPro={isPro} />
           </main>
 
           {/* Dyskretna stopka z wymogami AdSense i linkami prawnymi */}
-          <footer className="print:hidden w-full py-4 px-4 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-2 max-w-5xl mx-auto">
+          <footer className="print:hidden w-full py-4 px-4 pb-28 sm:pb-4 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-2 max-w-5xl mx-auto">
             <div className="flex items-center gap-1.5">
               <span>© {new Date().getFullYear()} Pulsivio. Wszelkie prawa zastrzeżone.</span>
             </div>
@@ -542,6 +612,14 @@ export default function App() {
           setIsAvatarSelectorOpen(true);
         }}
         onImportBackup={handleImportBackup}
+        onOpenLandingPage={() => {
+          setIsSettingsOpen(false);
+          setIsLandingPageOpen(true);
+        }}
+        onOpenSocialKit={() => {
+          setIsSettingsOpen(false);
+          setIsSocialKitOpen(true);
+        }}
       />
 
       {/* Avatar Selection Modal */}
@@ -569,6 +647,8 @@ export default function App() {
         isOpen={isProOpen}
         onClose={() => setIsProOpen(false)}
         lang={lang}
+        isPro={isPro}
+        onTogglePro={handleTogglePro}
       />
 
       {/* Run On Phone & Cross-Device Sync Modal */}
@@ -578,7 +658,7 @@ export default function App() {
         lang={lang}
         syncCode={syncCode}
         onSetSyncCode={handleSetSyncCode}
-        onManualSync={() => pullFromServer(syncCode, true)}
+        onManualSync={(overrideCode) => pullFromServer(overrideCode || syncCode, true)}
         isSyncing={isSyncing}
         lastSyncTime={lastSyncTime}
         measurementsCount={measurements.length}
@@ -627,6 +707,12 @@ export default function App() {
         onClose={() => setIsLandingPageOpen(false)}
         lang={lang}
         onOpenApp={() => setIsLandingPageOpen(false)}
+      />
+
+      {/* Social Media Kit Modal (Avatar & Banner Download) */}
+      <SocialMediaKitModal
+        isOpen={isSocialKitOpen}
+        onClose={() => setIsSocialKitOpen(false)}
       />
 
       {/* Privacy Policy & Cookies Modal (AdSense & RODO Compliance) */}

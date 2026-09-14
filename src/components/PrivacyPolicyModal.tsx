@@ -89,7 +89,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer"
+            className="px-4 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 dark:border dark:border-slate-700 text-white font-bold text-xs hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
           >
             {lang === 'pl' ? 'Rozumiem i akceptuję' : 'Close'}
           </button>

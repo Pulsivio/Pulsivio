@@ -1,9 +1,25 @@
-// Pulsivio Service Worker
-const CACHE_NAME = 'pulsivio-cache-v4';
+// Pulsivio Service Worker v5
+const CACHE_NAME = 'pulsivio-cache-v5';
 
-// Install event - activate immediately
+const PRECACHE_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/favicon.png'
+];
+
+// Install event - pre-cache core assets and activate immediately
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
+        console.warn('PWA Precache failed for some assets:', err);
+      });
+    }).then(() => self.skipWaiting())
+  );
 });
 
 // Activate event - clean up old caches and take control of all clients
@@ -44,9 +60,15 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => {
+      .catch(async () => {
         // If offline or network fails, try cache
-        return caches.match(event.request);
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') {
+          const fallback = await caches.match('/');
+          if (fallback) return fallback;
+        }
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
       })
   );
 });

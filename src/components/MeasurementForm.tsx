@@ -146,6 +146,13 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
 
     setValidationError('');
 
+    // Subtle native haptic feedback on mobile phones
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(20);
+      } catch {}
+    }
+
     onSave({
       systolic: nSys,
       diastolic: nDia,
@@ -228,144 +235,76 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-6">
           
-          {/* Main Triple Values: SYS / DIA / PULSE */}
-          <div className="grid grid-cols-1 xs:grid-cols-3 gap-3">
+          {/* Main Triple Values: SYS / DIA / PULSE - Clean, uncluttered layout */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3.5">
             
             {/* Systolic */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-700 dark:bg-slate-800/50">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5 sm:p-4 dark:border-slate-700 dark:bg-slate-800/50 flex flex-col justify-between">
+              <label className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1 truncate">
                 {t.sysLabel}
               </label>
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-baseline justify-between gap-1 mt-1">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="50"
                   max="280"
                   required
-                  placeholder={lang === 'pl' ? 'np. 120' : 'e.g. 120'}
+                  placeholder={lang === 'pl' ? '120' : '120'}
                   value={systolic}
                   onChange={(e) => {
                     setSystolic(e.target.value);
                     if (validationError) setValidationError('');
                   }}
-                  className="w-full text-2xl sm:text-3xl font-black text-slate-900 dark:text-white bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal"
+                  className="w-full text-2xl sm:text-4xl font-black text-slate-900 dark:text-white bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal"
                 />
-                <span className="text-xs font-semibold text-slate-400">mmHg</span>
-              </div>
-              <div className="mt-2 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(systolic, 10) || 120;
-                    setSystolic(String(Math.max(50, cur - 5)));
-                    if (validationError) setValidationError('');
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  -5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(systolic, 10) || 120;
-                    setSystolic(String(Math.min(280, cur + 5)));
-                    if (validationError) setValidationError('');
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  +5
-                </button>
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">mmHg</span>
               </div>
             </div>
 
             {/* Diastolic */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-700 dark:bg-slate-800/50">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5 sm:p-4 dark:border-slate-700 dark:bg-slate-800/50 flex flex-col justify-between">
+              <label className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1 truncate">
                 {t.diaLabel}
               </label>
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-baseline justify-between gap-1 mt-1">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="30"
                   max="180"
                   required
-                  placeholder={lang === 'pl' ? 'np. 80' : 'e.g. 80'}
+                  placeholder={lang === 'pl' ? '80' : '80'}
                   value={diastolic}
                   onChange={(e) => {
                     setDiastolic(e.target.value);
                     if (validationError) setValidationError('');
                   }}
-                  className="w-full text-2xl sm:text-3xl font-black text-slate-900 dark:text-white bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal"
+                  className="w-full text-2xl sm:text-4xl font-black text-slate-900 dark:text-white bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal"
                 />
-                <span className="text-xs font-semibold text-slate-400">mmHg</span>
-              </div>
-              <div className="mt-2 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(diastolic, 10) || 80;
-                    setDiastolic(String(Math.max(30, cur - 5)));
-                    if (validationError) setValidationError('');
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  -5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(diastolic, 10) || 80;
-                    setDiastolic(String(Math.min(180, cur + 5)));
-                    if (validationError) setValidationError('');
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  +5
-                </button>
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">mmHg</span>
               </div>
             </div>
 
             {/* Pulse */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-700 dark:bg-slate-800/50">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5 sm:p-4 dark:border-slate-700 dark:bg-slate-800/50 flex flex-col justify-between">
+              <label className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1 truncate">
                 {t.pulseLabel}
               </label>
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-baseline justify-between gap-1 mt-1">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="30"
                   max="220"
-                  placeholder={lang === 'pl' ? 'np. 72' : 'e.g. 72'}
+                  placeholder={lang === 'pl' ? '72' : '72'}
                   value={pulse}
                   onChange={(e) => setPulse(e.target.value)}
-                  className="w-full text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400 bg-transparent outline-none placeholder:text-rose-300/60 dark:placeholder:text-rose-900/60 placeholder:font-normal"
+                  className="w-full text-2xl sm:text-4xl font-black text-rose-600 dark:text-rose-400 bg-transparent outline-none placeholder:text-rose-300/60 dark:placeholder:text-rose-900/60 placeholder:font-normal"
                 />
-                <span className="text-xs font-semibold text-slate-400">bpm</span>
-              </div>
-              <div className="mt-2 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(pulse, 10) || 72;
-                    setPulse(String(Math.max(30, cur - 5)));
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  -5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cur = parseInt(pulse, 10) || 72;
-                    setPulse(String(Math.min(220, cur + 5)));
-                  }}
-                  className="flex-1 rounded-lg bg-white py-1 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 dark:bg-slate-700 dark:text-white cursor-pointer"
-                >
-                  +5
-                </button>
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">bpm</span>
               </div>
             </div>
-
           </div>
 
           {/* Live Classification Feedback Card */}
@@ -509,7 +448,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                   onClick={() => setArm('left')}
                   className={`rounded-xl py-2 text-xs font-bold transition-colors ${
                     arm === 'left'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                      ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white shadow-xs'
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                   }`}
                 >
@@ -520,7 +459,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                   onClick={() => setArm('right')}
                   className={`rounded-xl py-2 text-xs font-bold transition-colors ${
                     arm === 'right'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                      ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white shadow-xs'
                       : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                   }`}
                 >
@@ -605,7 +544,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                     onClick={() => setFeeling(f.id)}
                     className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
                       isSelected
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
                     }`}
                   >
@@ -632,7 +571,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                     className={`rounded-xl px-2.5 py-1 text-xs font-semibold border transition-all ${
                       isChecked
                         ? 'bg-sky-50 border-sky-300 text-sky-800 dark:bg-sky-950/60 dark:border-sky-700 dark:text-sky-200'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                        : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
                     }`}
                   >
                     {isChecked ? '✓ ' : '+ '}

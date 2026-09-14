@@ -78,7 +78,7 @@ export const SeniorView: React.FC<SeniorViewProps> = ({
         <div className="flex items-center gap-3">
           <div className="relative flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-xs ring-1 ring-amber-500/30 bg-slate-950">
             <img
-              src="/pulsify_avatar.png"
+              src="/avatars/pulsivio_official_brand.jpg"
               alt="Pulsivio"
               referrerPolicy="no-referrer"
               className="h-full w-full object-cover"
@@ -96,7 +96,7 @@ export const SeniorView: React.FC<SeniorViewProps> = ({
         <button
           type="button"
           onClick={onExitSeniorMode}
-          className="rounded-xl bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 shadow hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-all active:scale-95"
+          className="rounded-xl bg-slate-900 px-3 py-2 text-xs sm:text-sm font-bold text-white shadow hover:bg-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-all active:scale-95"
         >
           {t.seniorModeExit}
         </button>
@@ -121,9 +121,9 @@ export const SeniorView: React.FC<SeniorViewProps> = ({
             type="button"
             onClick={onOpenAssistant}
             id="senior-voice-assistant-main-btn"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-2xl bg-white px-6 py-4 text-base sm:text-lg font-extrabold text-rose-700 shadow-lg hover:bg-rose-50 active:scale-98 transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-2xl bg-rose-950/90 border border-rose-400/40 px-6 py-4 text-base sm:text-lg font-extrabold text-white shadow-lg hover:bg-rose-950 active:scale-98 transition-all cursor-pointer"
           >
-            <Mic className="h-6 w-6 text-rose-600 animate-bounce" />
+            <Mic className="h-6 w-6 text-rose-400 animate-bounce" />
             <span>{t.seniorVoicePressToSpeak || (lang === 'pl' ? 'Naciśnij i mów' : 'Tap and speak')}</span>
           </button>
         </div>

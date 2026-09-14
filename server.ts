@@ -3,14 +3,14 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
-import fs from "fs";
 
 dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Helper for Gemini AI
 function getGeminiClient(): GoogleGenAI | null {
@@ -28,20 +28,45 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// Storage directory for cross-device sync
+import fs from "fs";
+
+// Storage directory for cross-device sync and admin settings
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "sync_data.json");
+const AFFILIATE_FILE = path.join(DATA_DIR, "affiliate_config.json");
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-let syncStore: Record<string, { measurements: any[]; profile?: any; lastUpdated: number }> = {};
+let syncStore: Record<string, { measurements: any[]; profile?: any; lastUpdated: number }> = Object.create(null);
 if (fs.existsSync(DATA_FILE)) {
   try {
-    syncStore = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    if (raw && typeof raw === "object") {
+      Object.assign(syncStore, raw);
+    }
   } catch (e) {
     console.error("Error reading sync store:", e);
+  }
+}
+
+const SAFE_CODE_REGEX = /^[A-Z0-9_-]{3,24}$/;
+function isSafeCode(code: string): boolean {
+  if (!code || !SAFE_CODE_REGEX.test(code)) return false;
+  if (code === "__PROTO__" || code === "CONSTRUCTOR" || code === "PROTOTYPE") return false;
+  return true;
+}
+
+let affiliateStore: { partnerTag: string; customUrls: Record<string, string> } = {
+  partnerTag: "31212",
+  customUrls: {},
+};
+if (fs.existsSync(AFFILIATE_FILE)) {
+  try {
+    affiliateStore = JSON.parse(fs.readFileSync(AFFILIATE_FILE, "utf-8"));
+  } catch (e) {
+    console.error("Error reading affiliate store:", e);
   }
 }
 
@@ -53,15 +78,73 @@ function persistSyncStore() {
   }
 }
 
+function persistAffiliateStore() {
+  try {
+    fs.writeFileSync(AFFILIATE_FILE, JSON.stringify(affiliateStore, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Error saving affiliate store:", e);
+  }
+}
+
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Affiliate Config Endpoints (for monetization)
+app.get("/api/affiliate-config", (_req, res) => {
+  res.json(affiliateStore);
+});
+
+app.post("/api/admin/affiliate-config", (req, res) => {
+  const { partnerTag, customUrls } = req.body;
+  if (partnerTag !== undefined) {
+    affiliateStore.partnerTag = String(partnerTag).trim();
+  }
+  if (customUrls && typeof customUrls === "object") {
+    affiliateStore.customUrls = { ...affiliateStore.customUrls, ...customUrls };
+  }
+  persistAffiliateStore();
+  res.json({ success: true, affiliateStore });
+});
+
+// Global Avatar Upload Endpoint (writes to public/ for all users)
+app.post("/api/admin/avatar", (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      res.status(400).json({ error: "Missing imageBase64" });
+      return;
+    }
+
+    // Extract base64 payload
+    const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    const buffer = matches ? Buffer.from(matches[2], "base64") : Buffer.from(imageBase64, "base64");
+
+    const publicDir = path.join(process.cwd(), "public");
+    const avatarsDir = path.join(publicDir, "avatars");
+
+    if (!fs.existsSync(avatarsDir)) {
+      fs.mkdirSync(avatarsDir, { recursive: true });
+    }
+
+    // Save as official brand avatars
+    fs.writeFileSync(path.join(avatarsDir, "pulsivio_official_brand.jpg"), buffer);
+    fs.writeFileSync(path.join(publicDir, "social_avatar.jpg"), buffer);
+    fs.writeFileSync(path.join(publicDir, "pulsify_avatar.png"), buffer);
+    fs.writeFileSync(path.join(publicDir, "pulsify_avatar.jpg"), buffer);
+
+    res.json({ success: true, url: `/avatars/pulsivio_official_brand.jpg?v=${Date.now()}` });
+  } catch (err: any) {
+    console.error("Failed to save global avatar:", err);
+    res.status(500).json({ error: "Failed to save avatar: " + (err.message || String(err)) });
+  }
+});
+
 // Sync Endpoints (Phone <-> PC)
 app.get("/api/sync/:code", (req, res) => {
   const code = (req.params.code || "").toUpperCase().trim();
-  if (!code || code.length < 3) {
+  if (!isSafeCode(code)) {
     res.status(400).json({ error: "Invalid sync code" });
     return;
   }
@@ -80,133 +163,219 @@ app.get("/api/sync/:code", (req, res) => {
 app.post("/api/sync/:code", (req, res) => {
   const code = (req.params.code || "").toUpperCase().trim();
   const { measurements, profile } = req.body;
-  if (!code || code.length < 3) {
+  if (!isSafeCode(code)) {
     res.status(400).json({ error: "Invalid sync code" });
     return;
   }
 
   const now = Date.now();
   syncStore[code] = {
-    measurements: Array.isArray(measurements) ? measurements : [],
-    profile: profile || {},
+    measurements: Array.isArray(measurements) ? measurements.slice(0, 5000) : [],
+    profile: profile && typeof profile === "object" ? profile : {},
     lastUpdated: now,
   };
   persistSyncStore();
 
-  res.json({ success: true, timestamp: now });
+  res.json({
+    success: true,
+    lastUpdated: now,
+    count: syncStore[code].measurements.length,
+  });
 });
 
-// AI Voice & Text Cardiology Assistant endpoint
+// Voice / Chat Assistant Endpoint
 app.post("/api/assistant", async (req, res) => {
   try {
-    const { message, lang = "pl", recentReadings = [] } = req.body;
+    const { message, language = "pl", recentReadings = [] } = req.body;
+
     if (!message || typeof message !== "string") {
-      res.status(400).json({ error: "Brak treści wiadomości" });
+      res.status(400).json({ error: "Missing message" });
       return;
     }
 
     const ai = getGeminiClient();
 
-    // Context format
-    const summaryText = recentReadings.slice(0, 5).map((r: any) =>
-      `${r.date} ${r.time}: ${r.systolic}/${r.diastolic} mmHg, puls: ${r.pulse || "-"} bpm`
+    // Prepare context of recent readings
+    const readingsSummary = recentReadings.slice(0, 5).map((r: any) =>
+      `${r.date || ""} ${r.time || ""}: ${r.systolic}/${r.diastolic} mmHg, puls: ${r.pulse || "b/d"}`
     ).join("; ");
 
     if (ai) {
-      const systemInstruction = `Jesteś życzliwym, spokojnym i medycznie odpowiedzialnym asystentem w polskiej aplikacji kardiologicznej Pulsivio (dawniej KardioDziennik).
-Użytkownik może dyktować swoje pomiary głosem (np. "zapisz sto trzydzieści na osiemdziesiąt pięć, puls siedemdziesiąt") lub zadawać pytania o normy ciśnienia tętniczego, interpretację wyników oraz dobre nawyki (picie wody, sól, odpoczynek).
-Zawsze odpowiadaj zwięźle (maksymalnie 3-4 zdania), po polsku (lub w języku użytkownika: ${lang}), prostym i ciepłym językiem.
-Pamiętaj: jeśli wykryjesz wartości pomiaru ciśnienia w wypowiedzi, zwróć je w formacie JSON na końcu odpowiedzi jako blok:
-\`\`\`json
-{"detected": {"systolic": 130, "diastolic": 85, "pulse": 70}}
-\`\`\`
-Jeśli użytkownik pyta o poradę medyczną przy niebezpiecznie wysokim ciśnieniu (np. skurczowe powyżej 180 mmHg lub rozkurczowe powyżej 110 mmHg), przypomnij o konieczności natychmiastowego kontaktu z lekarzem lub pogotowiem ratunkowym (112). Nigdy nie zmieniaj leków na własną rękę.`;
+      const systemInstruction = `Nazywasz się Pulsi — jesteś życzliwym, mądrym i przede wszystkim BEZPIECZNYM asystentem zdrowia w aplikacji Pulsivio. Twoje imię to Pulsi (krótkie, miłe i łatwe do wymówienia).
+Odpowiadaj ZAWSZE w języku użytkownika (${language}). Gdy użytkownik wita się z Tobą lub po prostu rozmawia, odpowiadaj serdecznie jako Pulsi!
 
-      const prompt = `Ostatnie pomiary pacjenta: [${summaryText}].
-Wypowiedź użytkownika: "${message}".`;
+BEZWZGLĘDNY ZAKAZ UDZIELANIA PORAD MEDYCZNYCH I DIAGNOZOWANIA:
+1. Nigdy nie diagnozuj chorób, nie interpretuj bólów, nie oceniaj stanu zdrowia i nie sugeruj leków ani zmiany ich dawkowania!
+2. Na wszelkie pytania medyczne lub objawowe od razu odeślij do lekarza: "Jako asystent Pulsi nie jestem lekarzem i nie udzielam porad medycznych ani diagnoz. Wszelkie objawy i decyzje o lekach należy bezwzględnie skonsultować z lekarzem prowadzącym."
+3. Jedyne co wolno Ci podawać, to powszechnie znane normy ciśnienia (WHO/PTNT: optymalne <120/<80, prawidłowe 120-129/80-84, nadciśnienie od 140/90) oraz ogólne proste wskazówki stylu życia (np. ograniczenie soli w diecie, regularny odpoczynek, unikanie stresu, nawodnienie).
+4. W stanach alarmowych (ból w klatce, duszność, ciśnienie >=180/110) natychmiast każ wezwać pogotowie (112 lub 999).
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.3,
-        },
-      });
+ROZPOZNAWANIE I ZAPISYWANIE POMIARÓW:
+Użytkownicy dyktują wyniki w różnych formatach, np.:
+- "129;/85/78 przed tabletkami"
+- "120 na 80 puls 72"
+- "135/85/70 po spacerze"
+- "140 90 puls 68 rano"
+Zawsze wyciągnij:
+- systolic: liczba skurczowa (np. 129)
+- diastolic: liczba rozkurczowa (np. 85)
+- pulse: tętno/puls jeśli podano (np. 78)
+- notes: dodatkowe okoliczności (np. "przed tabletkami", "po spacerze", "rano")
 
-      const rawText = response.text || "";
-      let detectedMeasurement = null;
+Ostatnie pomiary użytkownika (do kontekstu): ${readingsSummary || "brak wpisów"}.
 
-      const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
-      let cleanText = rawText;
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed && parsed.detected && parsed.detected.systolic && parsed.detected.diastolic) {
-            detectedMeasurement = {
-              systolic: Number(parsed.detected.systolic),
-              diastolic: Number(parsed.detected.diastolic),
-              pulse: parsed.detected.pulse ? Number(parsed.detected.pulse) : undefined,
-            };
-          }
-        } catch {
-          // ignore json parse error
-        }
-        cleanText = rawText.replace(/```json[\s\S]*?```/, "").trim();
+Zwróć odpowiedź w formacie JSON z polami:
+- replyText: (string) krótka, zwięzła odpowiedź (np. "Zapisałem pomiar: 129/85 mmHg, puls 78 (przed tabletkami). Pamiętaj o regularnych konsultacjach z lekarzem.")
+- detectedMeasurement: (object | null) { systolic: number, diastolic: number, pulse?: number, notes?: string }`;
+
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: message,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+          },
+        });
+
+        const rawText = response.text || "{}";
+        const parsedData = JSON.parse(rawText);
+        res.json({
+          replyText: parsedData.replyText || "Dziękuję za wiadomość.",
+          detectedMeasurement: parsedData.detectedMeasurement || null,
+        });
+        return;
+      } catch (geminiError) {
+        console.error("Gemini API error, falling back to rule-based:", geminiError);
       }
-
-      res.json({
-        replyText: cleanText,
-        detectedMeasurement,
-      });
-      return;
     }
 
-    // Fallback if no Gemini API Key configured
-    const fallbackResponse = handleLocalAssistant(message, lang);
-    res.json(fallbackResponse);
+    // Fallback rule-based parsing and answers when Gemini API key is not yet set
+    const fallback = parseRuleBased(message, language);
+    res.json(fallback);
   } catch (error: any) {
-    console.error("AI Assistant API Error:", error);
-    res.json(handleLocalAssistant(req.body?.message || "", req.body?.lang || "pl"));
+    console.error("Error in /api/assistant:", error);
+    res.status(500).json({
+      replyText: "Przepraszam, wystąpił chwilowy błąd w komunikacji z asystentem.",
+      detectedMeasurement: null,
+    });
   }
 });
 
-function handleLocalAssistant(message: string, lang: string) {
-  const lower = message.toLowerCase();
+// Rule-based fallback parser
+function parseRuleBased(text: string, lang: string) {
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+  
+  // Try pattern 1: Three values with delimiters like: "129;/85/78 przed tabletkami", "120/80/72", "125-82-70"
+  const threePartMatch = clean.match(/(\d{2,3})\s*(?:;|\/|na|-|\s)+\s*(\d{2,3})\s*(?:;|\/|na|-|\s)+\s*(\d{2,3})/i);
+  // Try pattern 2: Standard two values "120 na 80", "120/80", "120 80", with pulse
+  const bpMatch = clean.match(/(\d{2,3})\s*(?:na|\/|przez|-|;|\s)\s*(\d{2,3})/i);
+  const pulseMatch = clean.match(/(?:puls|tętno|tętna|heart rate|puls:|hr)\s*[:=]?\s*(\d{2,3})/i) ||
+                     clean.match(/(\d{2,3})\s*(?:uderzeń|bpm|puls|tętno)/i);
 
-  const numMatches = message.match(/\b\d{2,3}\b/g);
-  if (numMatches && numMatches.length >= 2) {
-    const sys = parseInt(numMatches[0], 10);
-    const dia = parseInt(numMatches[1], 10);
-    const pulse = numMatches.length >= 3 ? parseInt(numMatches[2], 10) : undefined;
+  let detectedMeasurement = null;
 
-    if (sys >= 70 && sys <= 260 && dia >= 40 && dia <= 160) {
-      let statusPl = "w normie";
-      if (sys >= 140 || dia >= 90) statusPl = "podwyższone (I/II stopień nadciśnienia)";
-      else if (sys >= 130 || dia >= 85) statusPl = "wysokie prawidłowe";
-      else if (sys < 120 && dia < 80) statusPl = "optymalne";
-
-      return {
-        replyText: `Zrozumiałem pomiar: ${sys}/${dia} mmHg${pulse ? `, puls: ${pulse} bpm` : ""}. Wynik mieści się w zakresie: ${statusPl}. Czy zapisać ten pomiar w dzienniku?`,
-        detectedMeasurement: {
-          systolic: sys,
-          diastolic: dia,
-          pulse,
-        },
+  if (threePartMatch) {
+    const sys = parseInt(threePartMatch[1], 10);
+    const dia = parseInt(threePartMatch[2], 10);
+    const pulse = parseInt(threePartMatch[3], 10);
+    if (sys >= 50 && sys <= 260 && dia >= 30 && dia <= 160) {
+      let notes = clean.replace(threePartMatch[0], '').trim();
+      notes = notes.replace(/^(?:ciśnienie|cisnienie|puls|tętno|wynik|pomiar|zapisz|wpisz)[:\s,]*/i, '').trim();
+      detectedMeasurement = {
+        systolic: sys,
+        diastolic: dia,
+        pulse: pulse >= 30 && pulse <= 250 ? pulse : undefined,
+        notes: notes || "Wprowadzone głosowo",
+      };
+    }
+  } else if (bpMatch) {
+    const sys = parseInt(bpMatch[1], 10);
+    const dia = parseInt(bpMatch[2], 10);
+    if (sys >= 50 && sys <= 260 && dia >= 30 && dia <= 160) {
+      let notes = clean.replace(bpMatch[0], '');
+      if (pulseMatch) notes = notes.replace(pulseMatch[0], '');
+      notes = notes.replace(/^(?:ciśnienie|cisnienie|puls|tętno|wynik|pomiar|zapisz|wpisz)[:\s,]*/i, '').trim();
+      detectedMeasurement = {
+        systolic: sys,
+        diastolic: dia,
+        pulse: pulseMatch ? parseInt(pulseMatch[1], 10) : undefined,
+        notes: notes || "Wprowadzone głosowo",
       };
     }
   }
 
   const greetings = {
-    pl: "Dzień dobry! Jestem asystentem Pulsivio. Możesz podyktować mi swój pomiar (np. '125 na 80 puls 72') albo zapytać o normy ciśnienia tętniczego.",
-    en: "Hello! I am your Pulsivio assistant. Dictate your blood pressure (e.g. '125 over 80, pulse 72') or ask about normal pressure ranges.",
-    de: "Guten Tag! Ich bin Ihr Pulsivio-Assistent. Diktieren Sie Ihren Blutdruck oder fragen Sie nach Richtwerten.",
-    es: "¡Hola! Soy tu asistente de Pulsivio. Díctame tu presión arterial o consulta los rangos recomendados.",
-    fr: "Bonjour ! Je suis votre assistant Pulsivio. Dictez votre tension artérielle ou posez une question sur les normes de santé.",
-    pt: "Olá! Sou o seu assistente Pulsivio. Dite a sua pressão arterial ou pergunte sobre os valores de referência.",
-    ru: "Здравствуйте! Я ассистент Pulsivio. Назовите показатели давления (например '120 на 80 пульс 70') или спросите о нормах.",
+    pl: "Dzień dobry! Słucham Cię. Możesz podyktować swój wynik (np. '129;/85/78 przed tabletkami' albo '120 na 80 puls 70') lub zapytać o normy ciśnienia.",
+    en: "Hello! I am listening. You can dictate your reading (e.g. '120/80/70' or '120 over 80') or ask about blood pressure ranges.",
+    de: "Guten Tag! Ich höre zu. Sie können Ihren Messwert diktieren, z. B. '120 zu 80 Puls 70'.",
+    es: "¡Hola! Te escucho. Puedes dictar tu lectura, por ejemplo '120 sobre 80 pulso 70'.",
+    fr: "Bonjour ! Je vous écoute. Vous pouvez dicter votre mesure, par exemple '120 sur 80 pouls 70'.",
+    pt: "Olá! Estou ouvindo. Você pode ditar sua medição, por exemplo '120 por 80 pulso 70'.",
+    ru: "Здравствуйте! Я слушаю. Вы можете продиктовать свои показатели, например: '120 на 80 пульс 70'.",
   };
 
+  if (detectedMeasurement) {
+    const noteText = detectedMeasurement.notes && detectedMeasurement.notes !== "Wprowadzone głosowo" ? ` (${detectedMeasurement.notes})` : "";
+    const msg = {
+      pl: `Rozpoznałem pomiar: Ciśnienie ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, puls: ${detectedMeasurement.pulse}` : ""}${noteText}. Zapisać go w Twoim dzienniku?`,
+      en: `I recognized the measurement: Blood pressure ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulse: ${detectedMeasurement.pulse}` : ""}${noteText}. Would you like to save it?`,
+      de: `Messung erkannt: Blutdruck ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, Puls: ${detectedMeasurement.pulse}` : ""}.`,
+      es: `Medición reconocida: Presión arterial ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulso: ${detectedMeasurement.pulse}` : ""}.`,
+      fr: `Mesure reconnue : Tension ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pouls : ${detectedMeasurement.pulse}` : ""}. Voulez-vous l'enregistrer ?`,
+      pt: `Medição reconhecida: Pressão ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulso: ${detectedMeasurement.pulse}` : ""}. Deseja salvar?`,
+      ru: `Распознано измерение: Давление ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} мм рт. ст.${detectedMeasurement.pulse ? `, пульс: ${detectedMeasurement.pulse}` : ""}. Сохранить в дневник?`,
+    };
+    return {
+      replyText: (msg as any)[lang] || msg.pl,
+      detectedMeasurement,
+    };
+  }
+
+  // Difficult questions: medical advice, drugs, diagnostics, symptoms -> strict referral to doctor
+  if (
+    lower.includes("lek") ||
+    lower.includes("tablet") ||
+    lower.includes("dawk") ||
+    lower.includes("zawał") ||
+    lower.includes("zawal") ||
+    lower.includes("ból") ||
+    lower.includes("bol") ||
+    lower.includes("kłucie") ||
+    lower.includes("klucie") ||
+    lower.includes("duszno") ||
+    lower.includes("diagnoz") ||
+    lower.includes("leczyć") ||
+    lower.includes("leczyc") ||
+    lower.includes("recept") ||
+    lower.includes("doktor") ||
+    lower.includes("lekarz") ||
+    lower.includes("choro")
+  ) {
+    const medNotice = {
+      pl: "Jako asystent cyfrowy nie jestem lekarzem i nie udzielam porad medycznych, nie stawiam diagnoz ani nie doradzam w kwestii doboru czy dawkowania leków. Wszelkie niepokojące objawy oraz kwestie leczenia należy bezwzględnie skonsultować z lekarzem prowadzącym. W stanach nagłego zagrożenia dzwoń natychmiast pod 112 lub 999.",
+      en: "As a digital assistant, I am not a doctor. I cannot diagnose conditions or advise on medication doses. Please consult all symptoms and treatment decisions with your physician. In an emergency, call 112 or 911.",
+    };
+    return {
+      replyText: (medNotice as any)[lang] || medNotice.pl,
+      detectedMeasurement: null,
+    };
+  }
+
+  // How to measure blood pressure
+  if (lower.includes("jak mierzy") || lower.includes("jak zbad") || lower.includes("zasad") || lower.includes("przygotow")) {
+    const guide = {
+      pl: "Zasady prawidłowego pomiaru: 1. Odpocznij 5 minut w ciszy przed badaniem. 2. Siedź z podpartymi plecami i obiema stopami na podłodze. 3. Mankiet załóż na ramię na wysokości serca. 4. Nie pij kawy ani nie pal 30 min przed pomiarem. 5. Nie ruszaj się i nie rozmawiaj w trakcie pomiaru.",
+      en: "Measurement tips: 1. Rest quietly for 5 minutes. 2. Sit with back supported and feet flat on floor. 3. Keep cuff on upper arm at heart level. 4. Avoid caffeine and smoking 30 min prior. 5. Do not talk during the reading.",
+    };
+    return {
+      replyText: (guide as any)[lang] || guide.pl,
+      detectedMeasurement: null,
+    };
+  }
+
+  // Common questions: blood pressure and pulse norms
   if (lower.includes("norm") || lower.includes("prawidłow") || lower.includes("prawidlow") || lower.includes("optymal") || lower.includes("норм") || lower.includes("puls") || lower.includes("tętn")) {
     const norms = {
       pl: "Normy ciśnienia (WHO/PTNT): Optymalne: poniżej 120/80 mmHg. Prawidłowe: 120-129 / 80-84 mmHg. Wysokie prawidłowe: 130-139 / 85-89 mmHg. Nadciśnienie 1. stopnia: 140-159 / 90-99 mmHg. Prawidłowy spoczynkowy puls to 60-100 uderzeń na minutę.",

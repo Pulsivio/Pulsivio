@@ -106,7 +106,8 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [viewMode, setViewMode] = useState<'groupedDays' | 'singleList'>('groupedDays');
-  const [daysRange, setDaysRange] = useState<number>(7); // Default 7 days (full week)
+  const [daysRange, setDaysRange] = useState<number>(7); // Default 7 days (calendar week)
+  const [weekOffset, setWeekOffset] = useState<number>(0); // 0 = current calendar week, -1 = last week, etc.
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [selectedDayDetail, setSelectedDayDetail] = useState<DayGroup | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
@@ -138,17 +139,19 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
 
   // Overall stats
   const stats = useMemo(() => {
-    if (filtered.length === 0) return { sys: 0, dia: 0, pulse: 0, total: 0 };
+    if (filtered.length === 0) return { sys: 0, dia: 0, pulse: 0, total: 0, normPercent: 0 };
     const sysSum = filtered.reduce((acc, m) => acc + m.systolic, 0);
     const diaSum = filtered.reduce((acc, m) => acc + m.diastolic, 0);
     const pulseSum = filtered.reduce((acc, m) => acc + (m.pulse || 0), 0);
     const withPulse = filtered.filter((m) => m.pulse).length || 1;
+    const inNorm = filtered.filter((m) => m.systolic < 135 && m.diastolic < 85).length;
 
     return {
       sys: Math.round(sysSum / filtered.length),
       dia: Math.round(diaSum / filtered.length),
       pulse: Math.round(pulseSum / withPulse),
       total: filtered.length,
+      normPercent: Math.round((inNorm / filtered.length) * 100),
     };
   }, [filtered]);
 
@@ -236,20 +239,158 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
     return groups;
   }, [filtered, lang]);
 
+  // Calendar week calculation: Monday 00:00:00 to Sunday 23:59:59
+  // Automatically advances when Sunday passes into Monday (po 00:00 w niedzielę)
+  const calendarWeek = useMemo(() => {
+    const now = new Date();
+    // Move to target week offset
+    const target = new Date(now);
+    target.setDate(now.getDate() + weekOffset * 7);
+
+    // In JS, getDay(): 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+    const day = target.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+
+    const monday = new Date(target);
+    monday.setDate(target.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const todayStr = now.toISOString().split('T')[0];
+
+    const dayLetterMap: Record<string, string[]> = {
+      pl: ['P', 'W', 'Ś', 'C', 'P', 'S', 'N'],
+      en: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+      de: ['M', 'D', 'M', 'D', 'F', 'S', 'S'],
+      fr: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
+      es: ['L', 'M', 'X', 'J', 'V', 'S', 'D'],
+      pt: ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'],
+      ru: ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'],
+    };
+
+    const dayNameMap: Record<string, string[]> = {
+      pl: ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'],
+      en: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      de: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'],
+      fr: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+      es: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+      pt: ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'],
+      ru: ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'],
+    };
+
+    const letters = dayLetterMap[lang] || dayLetterMap.pl;
+    const names = dayNameMap[lang] || dayNameMap.pl;
+
+    // Fast map of measurements in current filtered list by date
+    const itemsByDate = new Map<string, Measurement[]>();
+    filtered.forEach((m) => {
+      const list = itemsByDate.get(m.date) || [];
+      list.push(m);
+      itemsByDate.set(m.date, list);
+    });
+
+    const days: {
+      letter: string;
+      name: string;
+      dateStr: string;
+      shortDate: string;
+      isToday: boolean;
+      isFuture: boolean;
+      dayIdx: number;
+      count: number;
+      hasData: boolean;
+      items: Measurement[];
+    }[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      const shortDate = `${dd}.${mm}`;
+      const items = itemsByDate.get(dateStr) || [];
+
+      days.push({
+        letter: letters[i],
+        name: names[i],
+        dateStr,
+        shortDate,
+        isToday: dateStr === todayStr,
+        isFuture: dateStr > todayStr,
+        dayIdx: i === 6 ? 0 : i + 1,
+        count: items.length,
+        hasData: items.length > 0,
+        items,
+      });
+    }
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const startStr = `${String(monday.getDate()).padStart(2, '0')}.${String(monday.getMonth() + 1).padStart(2, '0')}`;
+    const endStr = `${String(sunday.getDate()).padStart(2, '0')}.${String(sunday.getMonth() + 1).padStart(2, '0')}`;
+
+    const totalWeekItems = days.flatMap((d) => d.items);
+
+    return {
+      monday,
+      sunday,
+      startStr,
+      endStr,
+      isCurrentWeek: weekOffset === 0,
+      days,
+      totalWeekItems,
+    };
+  }, [weekOffset, lang, filtered]);
+
   // Pagination for grouped days (using daysRange, defaults to 7 days)
   const effectiveRange = daysRange === 9999 ? Math.max(1, dayGroups.length) : daysRange;
   const totalDayPages = Math.max(1, Math.ceil(dayGroups.length / effectiveRange));
   const validDayPage = Math.min(currentPage, totalDayPages);
+
   const pagedDays = useMemo(() => {
+    if (daysRange === 7) {
+      const weekDates = new Set(calendarWeek.days.map((d) => d.dateStr));
+      return dayGroups.filter((g) => weekDates.has(g.date));
+    }
     if (daysRange === 9999) return dayGroups;
     const start = (validDayPage - 1) * daysRange;
     return dayGroups.slice(start, start + daysRange);
-  }, [dayGroups, validDayPage, daysRange]);
+  }, [dayGroups, validDayPage, daysRange, calendarWeek]);
 
   // Compute Weekly / Page Stats
   const weekStats = useMemo(() => {
-    const allItems = pagedDays.flatMap((d) => d.items);
-    if (allItems.length === 0) return null;
+    const allItems = daysRange === 7 ? calendarWeek.totalWeekItems : pagedDays.flatMap((d) => d.items);
+
+    if (allItems.length === 0) {
+      if (daysRange === 7) {
+        return {
+          avgSys: 0,
+          avgDia: 0,
+          avgPulse: 0,
+          totalReadings: 0,
+          daysCount: 7,
+          mSys: null,
+          mDia: null,
+          mCount: 0,
+          nSys: null,
+          nDia: null,
+          nCount: 0,
+          eSys: null,
+          eDia: null,
+          eCount: 0,
+          xSys: null,
+          xDia: null,
+          xCount: 0,
+          morningSurge: null,
+          normPercent: 0,
+          startDate: calendarWeek.days[6]?.dateStr,
+          endDate: calendarWeek.days[0]?.dateStr,
+        };
+      }
+      return null;
+    }
+
     const sysSum = allItems.reduce((acc, m) => acc + m.systolic, 0);
     const diaSum = allItems.reduce((acc, m) => acc + m.diastolic, 0);
     const pulseSum = allItems.reduce((acc, m) => acc + (m.pulse || 0), 0);
@@ -282,7 +423,7 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
       avgDia: Math.round(diaSum / allItems.length),
       avgPulse: Math.round(pulseSum / withPulse),
       totalReadings: allItems.length,
-      daysCount: pagedDays.length,
+      daysCount: daysRange === 7 ? 7 : pagedDays.length,
       mSys,
       mDia,
       mCount: morningItems.length,
@@ -297,111 +438,13 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
       xCount: extraItems.length,
       morningSurge,
       normPercent,
-      startDate: pagedDays[pagedDays.length - 1]?.date,
-      endDate: pagedDays[0]?.date,
+      startDate: daysRange === 7 ? calendarWeek.days[6]?.dateStr : pagedDays[pagedDays.length - 1]?.date,
+      endDate: daysRange === 7 ? calendarWeek.days[0]?.dateStr : pagedDays[0]?.date,
     };
-  }, [pagedDays]);
+  }, [pagedDays, daysRange, calendarWeek]);
 
-  // 1-letter week strip: P, W, Ś, C, P, S, N (Monday through Sunday)
-  const weekDaysStrip = useMemo(() => {
-    let dayDefs: { letter: string; name: string; dayIdx: number }[] = [];
-
-    switch (lang) {
-      case 'pl':
-        dayDefs = [
-          { letter: 'P', name: 'Poniedziałek', dayIdx: 1 },
-          { letter: 'W', name: 'Wtorek', dayIdx: 2 },
-          { letter: 'Ś', name: 'Środa', dayIdx: 3 },
-          { letter: 'C', name: 'Czwartek', dayIdx: 4 },
-          { letter: 'P', name: 'Piątek', dayIdx: 5 },
-          { letter: 'S', name: 'Sobota', dayIdx: 6 },
-          { letter: 'N', name: 'Niedziela', dayIdx: 0 },
-        ];
-        break;
-      case 'de':
-        dayDefs = [
-          { letter: 'M', name: 'Montag', dayIdx: 1 },
-          { letter: 'D', name: 'Dienstag', dayIdx: 2 },
-          { letter: 'M', name: 'Mittwoch', dayIdx: 3 },
-          { letter: 'D', name: 'Donnerstag', dayIdx: 4 },
-          { letter: 'F', name: 'Freitag', dayIdx: 5 },
-          { letter: 'S', name: 'Samstag', dayIdx: 6 },
-          { letter: 'S', name: 'Sonntag', dayIdx: 0 },
-        ];
-        break;
-      case 'fr':
-        dayDefs = [
-          { letter: 'L', name: 'Lundi', dayIdx: 1 },
-          { letter: 'M', name: 'Mardi', dayIdx: 2 },
-          { letter: 'M', name: 'Mercredi', dayIdx: 3 },
-          { letter: 'J', name: 'Jeudi', dayIdx: 4 },
-          { letter: 'V', name: 'Vendredi', dayIdx: 5 },
-          { letter: 'S', name: 'Samedi', dayIdx: 6 },
-          { letter: 'D', name: 'Dimanche', dayIdx: 0 },
-        ];
-        break;
-      case 'es':
-        dayDefs = [
-          { letter: 'L', name: 'Lunes', dayIdx: 1 },
-          { letter: 'M', name: 'Martes', dayIdx: 2 },
-          { letter: 'X', name: 'Miércoles', dayIdx: 3 },
-          { letter: 'J', name: 'Jueves', dayIdx: 4 },
-          { letter: 'V', name: 'Viernes', dayIdx: 5 },
-          { letter: 'S', name: 'Sábado', dayIdx: 6 },
-          { letter: 'D', name: 'Domingo', dayIdx: 0 },
-        ];
-        break;
-      case 'pt':
-        dayDefs = [
-          { letter: 'S', name: 'Segunda-feira', dayIdx: 1 },
-          { letter: 'T', name: 'Terça-feira', dayIdx: 2 },
-          { letter: 'Q', name: 'Quarta-feira', dayIdx: 3 },
-          { letter: 'Q', name: 'Quinta-feira', dayIdx: 4 },
-          { letter: 'S', name: 'Sexta-feira', dayIdx: 5 },
-          { letter: 'S', name: 'Sábado', dayIdx: 6 },
-          { letter: 'D', name: 'Domingo', dayIdx: 0 },
-        ];
-        break;
-      case 'ru':
-        dayDefs = [
-          { letter: 'П', name: 'Понедельник', dayIdx: 1 },
-          { letter: 'В', name: 'Вторник', dayIdx: 2 },
-          { letter: 'С', name: 'Среда', dayIdx: 3 },
-          { letter: 'Ч', name: 'Четверг', dayIdx: 4 },
-          { letter: 'П', name: 'Пятница', dayIdx: 5 },
-          { letter: 'С', name: 'Суббота', dayIdx: 6 },
-          { letter: 'В', name: 'Воскресенье', dayIdx: 0 },
-        ];
-        break;
-      default:
-        dayDefs = [
-          { letter: 'M', name: 'Monday', dayIdx: 1 },
-          { letter: 'T', name: 'Tuesday', dayIdx: 2 },
-          { letter: 'W', name: 'Wednesday', dayIdx: 3 },
-          { letter: 'T', name: 'Thursday', dayIdx: 4 },
-          { letter: 'F', name: 'Friday', dayIdx: 5 },
-          { letter: 'S', name: 'Saturday', dayIdx: 6 },
-          { letter: 'S', name: 'Sunday', dayIdx: 0 },
-        ];
-        break;
-    }
-
-    // Check count of measurements on each day of week in pagedDays
-    return dayDefs.map((def) => {
-      let count = 0;
-      pagedDays.forEach((group) => {
-        const d = new Date(group.date + 'T12:00:00');
-        if (d.getDay() === def.dayIdx) {
-          count += group.items.length;
-        }
-      });
-      return {
-        ...def,
-        count,
-        hasData: count > 0,
-      };
-    });
-  }, [pagedDays, lang]);
+  // Alias weekDaysStrip to calendarWeek.days
+  const weekDaysStrip = calendarWeek.days;
 
   const getClassificationIcon = (level: string) => {
     switch (level) {
@@ -460,16 +503,16 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
   return (
     <div className="mx-auto max-w-5xl px-2.5 py-3 sm:px-6 sm:py-4 space-y-3">
       
-      {/* Top Stat Summary Banner - Distinct, Bright & Colorful Tiles */}
+      {/* Top Stat Summary Banner - Unified Blood Pressure & Health Indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-        {/* Tile 1: Systolic - Vibrant Sky Blue */}
+        {/* Tile 1: Unified Blood Pressure (SYS / DIA) - Vibrant Sky Blue */}
         <div className="rounded-2xl border-2 border-sky-300/90 bg-gradient-to-br from-sky-50 via-white to-sky-100/40 p-2.5 sm:p-3.5 dark:border-sky-600/70 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/50 shadow-xs flex items-center justify-between transition-all hover:shadow-sm">
           <div className="min-w-0 flex-1 mr-1">
             <span className="text-[10px] sm:text-xs font-bold text-sky-700 dark:text-sky-300 truncate block">
-              {t.avgSys}
+              {lang === 'pl' ? 'Średnie ciśnienie' : 'Average Blood Pressure'}
             </span>
             <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight block truncate">
-              {stats.sys || '--'}{' '}
+              {stats.sys && stats.dia ? `${stats.sys}/${stats.dia}` : '--/--'}{' '}
               <span className="text-[9px] sm:text-[10px] font-bold text-sky-600 dark:text-sky-400">mmHg</span>
             </span>
           </div>
@@ -478,23 +521,7 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
           </div>
         </div>
 
-        {/* Tile 2: Diastolic - Fresh Mint / Emerald */}
-        <div className="rounded-2xl border-2 border-emerald-300/90 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40 p-2.5 sm:p-3.5 dark:border-emerald-600/70 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/50 shadow-xs flex items-center justify-between transition-all hover:shadow-sm">
-          <div className="min-w-0 flex-1 mr-1">
-            <span className="text-[10px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate block">
-              {t.avgDia}
-            </span>
-            <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight block truncate">
-              {stats.dia || '--'}{' '}
-              <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400">mmHg</span>
-            </span>
-          </div>
-          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs shadow-emerald-500/30 shrink-0">
-            <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-
-        {/* Tile 3: Pulse - Vibrant Coral / Rose */}
+        {/* Tile 2: Pulse - Vibrant Coral / Rose */}
         <div className="rounded-2xl border-2 border-rose-300/90 bg-gradient-to-br from-rose-50 via-white to-rose-100/40 p-2.5 sm:p-3.5 dark:border-rose-600/70 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/50 shadow-xs flex items-center justify-between transition-all hover:shadow-sm">
           <div className="min-w-0 flex-1 mr-1">
             <span className="text-[10px] sm:text-xs font-bold text-rose-700 dark:text-rose-300 truncate block">
@@ -507,6 +534,22 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
           </div>
           <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-rose-500 text-white shadow-xs shadow-rose-500/30 shrink-0">
             <HeartPulse className="h-4 w-4 sm:h-5 sm:w-5 fill-white/20" />
+          </div>
+        </div>
+
+        {/* Tile 3: Clinical Norm Compliance (PTNT <135/85) - Fresh Mint / Emerald */}
+        <div className="rounded-2xl border-2 border-emerald-300/90 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40 p-2.5 sm:p-3.5 dark:border-emerald-600/70 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/50 shadow-xs flex items-center justify-between transition-all hover:shadow-sm">
+          <div className="min-w-0 flex-1 mr-1">
+            <span className="text-[10px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate block">
+              {lang === 'pl' ? 'W normie PTNT' : 'In Normal Range'}
+            </span>
+            <span className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-tight block truncate">
+              {stats.total > 0 ? `${stats.normPercent}%` : '--'}{' '}
+              <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700/80 dark:text-emerald-400/80">&lt;135/85</span>
+            </span>
+          </div>
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs shadow-emerald-500/30 shrink-0">
+            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
         </div>
 
@@ -527,6 +570,44 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
         </div>
       </div>
 
+      {/* CENTRAL PROMINENT ADD MEASUREMENT BUTTON (DUŻY PLUS W CENTRUM) */}
+      <div className="rounded-2xl bg-gradient-to-r from-rose-600 via-red-500 to-rose-700 text-white p-3 sm:p-4 shadow-lg shadow-rose-500/20 border-2 border-rose-300 dark:border-rose-700 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in">
+        <div className="flex items-center gap-3 text-center sm:text-left min-w-0">
+          <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-white/20 text-white shadow-inner shrink-0">
+            <HeartPulse className="h-6 w-6 text-white animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <h3 className="text-sm sm:text-base font-black text-white leading-tight">
+                {lang === 'pl' ? 'Dodaj Nowy Pomiar Ciśnienia' : 'Add Blood Pressure Reading'}
+              </h3>
+              <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                Szybki Zapis
+              </span>
+            </div>
+            <p className="text-[11px] sm:text-xs text-rose-100 font-medium truncate sm:whitespace-normal">
+              {lang === 'pl'
+                ? 'Zapisz poranne, popołudniowe lub wieczorne badanie w kilka sekund'
+                : 'Log your morning, noon or evening reading in seconds'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            const today = new Date().toISOString().split('T')[0];
+            onAddNewToDate?.(today);
+          }}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 sm:py-3 text-sm sm:text-base font-black text-rose-600 shadow-md hover:bg-rose-50 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer shrink-0"
+        >
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-600 text-white">
+            <Plus className="h-4 w-4 stroke-[3]" />
+          </div>
+          <span>{lang === 'pl' ? 'Dodaj pomiar teraz (+)' : 'Add reading now (+)'}</span>
+        </button>
+      </div>
+
       {/* Filter, Search & View Switcher */}
       <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -541,7 +622,7 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
               }}
               className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer ${
                 periodFilter === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                  ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
               }`}
             >
@@ -732,25 +813,66 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
         /* GROUPED BY DAY VIEW */
         <div className="space-y-3.5">
           
-          {/* Weekly Summary Card with 1-Letter Strip (Luminous Azure / Sky palette - preserving Red for High BP!) */}
+          {/* Weekly Summary Card with 7-Day Calendar Strip (Poniedziałek -> Niedziela) */}
           {weekStats && (
             <div className="rounded-2xl border-2 border-sky-300/90 bg-gradient-to-br from-sky-50/90 via-white to-cyan-50/60 p-3 sm:p-4 dark:border-sky-500/60 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/40 shadow-sm space-y-3">
               
               <div className="flex flex-wrap items-center justify-between gap-2">
                 
-                {/* Title and readings count */}
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-xs shadow-sky-500/30">
+                {/* Title, Calendar Week Dates and Week Navigation */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-xs shadow-sky-500/30 shrink-0">
                     <CalendarRange className="h-4 w-4" />
                   </span>
-                  <div className="flex items-baseline gap-1.5">
-                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                      {daysRange === 7 
-                        ? (t.weekLabel || (lang === 'pl' ? 'Tydzień' : 'Week'))
-                        : (lang === 'pl' ? `${weekStats.daysCount} dni` : `${weekStats.daysCount} ${t.daysLabel || 'days'}`)}
-                    </h3>
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      ({weekStats.totalReadings} {t.readingsPluralLabel || (lang === 'pl' ? 'pomiarów' : 'readings')})
+                  <div>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                        {daysRange === 7 ? (
+                          <span>
+                            {calendarWeek.isCurrentWeek
+                              ? (lang === 'pl' ? 'Bieżący tydzień' : 'Current week')
+                              : (lang === 'pl' ? 'Tydzień' : 'Week')}
+                            <span className="ml-1.5 text-sky-700 dark:text-sky-300 text-xs sm:text-sm font-bold">
+                              ({calendarWeek.startStr} – {calendarWeek.endStr})
+                            </span>
+                          </span>
+                        ) : (
+                          lang === 'pl' ? `${weekStats.daysCount} dni` : `${weekStats.daysCount} ${t.daysLabel || 'days'}`
+                        )}
+                      </h3>
+
+                      {daysRange === 7 && (
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          <button
+                            type="button"
+                            onClick={() => setWeekOffset((prev) => prev - 1)}
+                            className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                            title={lang === 'pl' ? 'Poprzedni tydzień' : 'Previous week'}
+                          >
+                            <ChevronLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          </button>
+                          {weekOffset !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setWeekOffset(0)}
+                              className="px-1.5 py-0.5 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 text-[10px] font-black hover:bg-sky-200 transition-colors cursor-pointer"
+                            >
+                              {lang === 'pl' ? 'Bieżący' : 'Today'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setWeekOffset((prev) => prev + 1)}
+                            className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                            title={lang === 'pl' ? 'Następny tydzień' : 'Next week'}
+                          >
+                            <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
+                      {weekStats.totalReadings} {t.readingsPluralLabel || (lang === 'pl' ? 'pomiarów w wybranym oknie' : 'readings in selected window')}
                     </span>
                   </div>
                 </div>
@@ -766,7 +888,7 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    {lang === 'pl' ? 'Tydzień (7d)' : `7 ${t.daysLabel || 'd'}`}
+                    {lang === 'pl' ? 'Tydzień (Pn-Nd)' : `7 ${t.daysLabel || 'd'}`}
                   </button>
                   <button
                     type="button"
@@ -804,27 +926,56 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
                 </div>
               </div>
 
-              {/* 1-Letter Week Strip: P, W, Ś, C, P, S, N - Luminous Cyan/Azure Tiles */}
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1 hidden sm:inline">
-                  {t.daysLabel || (lang === 'pl' ? 'Dni' : 'Days')}:
-                </span>
-                <div className="grid grid-cols-7 gap-1.5 flex-1">
-                  {weekDaysStrip.map((item, idx) => (
-                    <div
+              {/* 7-Day Calendar Strip: Poniedziałek -> Niedziela
+                  Jasny jeśli jest wpis, na szaro gdy 0 wpisów */}
+              <div className="space-y-1 pt-0.5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  <span>{lang === 'pl' ? 'Tydzień dzień po dniu:' : 'Days of the week:'}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {lang === 'pl' ? 'Szary: 0 wpisów • Błękitny: pomiar zapisany' : 'Gray: 0 • Blue: has readings'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                  {calendarWeek.days.map((day, idx) => (
+                    <button
                       key={idx}
-                      className={`flex flex-col items-center justify-center py-2 sm:py-2.5 rounded-xl border-2 text-center transition-all ${
-                        item.hasData
-                          ? 'bg-gradient-to-b from-sky-400 to-blue-600 text-white border-sky-300 shadow-sm ring-2 ring-sky-300/80 dark:ring-sky-500/60'
-                          : 'bg-white/95 dark:bg-slate-800/95 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700'
+                      type="button"
+                      onClick={() => {
+                        if (day.hasData) {
+                          setExpandedDays((prev) => ({ ...prev, [day.dateStr]: true }));
+                        } else if (onAddNewToDate) {
+                          onAddNewToDate(day.dateStr);
+                        }
+                      }}
+                      className={`group relative flex flex-col items-center justify-between py-2 sm:py-2.5 px-0.5 sm:px-1 rounded-xl sm:rounded-2xl border-2 text-center transition-all cursor-pointer select-none ${
+                        day.hasData
+                          ? 'bg-gradient-to-b from-sky-400 via-sky-500 to-blue-600 text-white border-sky-300 shadow-sm ring-2 ring-sky-300/80 dark:ring-sky-500/60 hover:scale-102 hover:shadow-md'
+                          : 'bg-slate-100/90 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-200/60'
                       }`}
-                      title={`${item.name}: ${item.count} ${t.readingsPluralLabel || 'pomiarów'}`}
+                      title={`${day.name} (${day.shortDate}): ${day.count} ${lang === 'pl' ? 'wpisów' : 'readings'}${!day.hasData ? ' - Kliknij, aby dodać pomiar' : ''}`}
                     >
-                      <span className="text-xs sm:text-sm font-black leading-none">{item.letter}</span>
-                      <span className="text-[10px] sm:text-[11px] opacity-95 leading-none mt-1 font-bold">
-                        {item.hasData ? item.count : '•'}
+                      {day.isToday && (
+                        <span className={`absolute -top-1.5 sm:-top-2 px-1 sm:px-1.5 py-0.2 rounded-full text-[8px] font-black uppercase tracking-wider shadow-2xs ${
+                          day.hasData ? 'bg-amber-300 text-slate-950 ring-1 ring-white' : 'bg-sky-500 text-white'
+                        }`}>
+                          Dziś
+                        </span>
+                      )}
+                      <span className="text-xs sm:text-sm font-black leading-none">{day.letter}</span>
+                      <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${
+                        day.hasData ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {day.shortDate}
                       </span>
-                    </div>
+                      <span className={`mt-1 text-[9px] sm:text-[10px] font-black rounded-md px-1 sm:px-1.5 py-0.5 leading-none ${
+                        day.hasData
+                          ? 'bg-white/25 text-white'
+                          : 'bg-slate-200/70 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
+                      }`}>
+                        {day.count > 0 ? `${day.count} ${lang === 'pl' ? (day.count === 1 ? 'wpis' : 'wpisy') : ''}` : (lang === 'pl' ? '0' : '0')}
+                      </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -941,6 +1092,39 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
                 )}
               </div>
 
+            </div>
+          )}
+
+          {/* Empty Week State (e.g. after Sunday midnight / fresh week) */}
+          {pagedDays.length === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-sky-200 dark:border-sky-800/80 p-6 sm:p-8 text-center bg-white/70 dark:bg-slate-900/60 shadow-xs space-y-3">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400">
+                <CalendarRange className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  {daysRange === 7 
+                    ? (lang === 'pl' ? `Brak wpisów w wybranym tygodniu (${calendarWeek.startStr} – ${calendarWeek.endStr})` : 'No entries for this week')
+                    : (lang === 'pl' ? 'Brak wpisów w wybranym okresie' : 'No entries in this period')}
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                  {lang === 'pl'
+                    ? 'Nowy tydzień resetuje licznik po północy w niedzielę. Kliknij dowolny dzień na pasku u góry lub przycisk poniżej, aby zapisać pierwszy pomiar.'
+                    : 'A new week begins after Sunday midnight. Click any day on the strip above or the button below to add your reading.'}
+                </p>
+              </div>
+              {onAddNewToDate && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onAddNewToDate(new Date().toISOString().split('T')[0])}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white text-xs font-black transition-all shadow-sm cursor-pointer active:scale-95"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>{lang === 'pl' ? 'Wprowadź dzisiejszy pomiar' : 'Add measurement'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

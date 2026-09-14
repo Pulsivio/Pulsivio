@@ -5,15 +5,18 @@ interface AdBannerProps {
   format?: 'auto' | 'horizontal' | 'rectangle';
   className?: string;
   clientId?: string; // np. ca-pub-XXXXXXXXXXXXXXXX
+  isPro?: boolean; // Jeśli true, wszystkie reklamy AdSense są natychmiast wyłączone
 }
 
 export const AdBanner: React.FC<AdBannerProps> = ({
   slot = '',
   format = 'auto',
   className = '',
-  clientId = '',
+  clientId = 'ca-pub-5529697511853714',
+  isPro = false,
 }) => {
   useEffect(() => {
+    if (isPro) return;
     // Bezpieczne ładowanie AdSense bez błędów w konsoli jeśli adblock lub brak skryptu
     try {
       if (typeof window !== 'undefined') {
@@ -24,7 +27,12 @@ export const AdBanner: React.FC<AdBannerProps> = ({
     } catch (e) {
       // Ignoruj błędy zablokowanych reklam / adblocka
     }
-  }, []);
+  }, [isPro]);
+
+  // Użytkownicy PRO mają całkowicie wyłączone reklamy
+  if (isPro) {
+    return null;
+  }
 
   // W środowisku deweloperskim lub gdy brak slotu/klienta, renderujemy elegancki, subtelny placeholder
   // który nie psuje wyglądu aplikacji

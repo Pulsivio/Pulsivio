@@ -42,6 +42,18 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Prevent iOS Safari from jerky auto-zoom on input focus */
+  @media screen and (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Faster mobile responsiveness without double-tap delay */
+  button, a {
+    touch-action: manipulation;
+  }
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera, and Firefox */

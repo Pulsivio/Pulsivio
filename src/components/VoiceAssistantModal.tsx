@@ -53,14 +53,14 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
           id: 'welcome',
           sender: 'assistant',
           text: lang === 'pl'
-            ? 'Dzień dobry! Jestem Twoim Asystentem Zdrowia. Możesz podyktować swój pomiar (np. "120 na 80 puls 68") albo zapytać o normy ciśnienia i przygotowanie do badania. W czym mogę pomóc?'
+            ? 'Cześć! Nazywam się Pulsi — jestem Twoim asystentem w Pulsivio. Możesz ze mną swobodnie porozmawiać, zapytać o normy ciśnienia, przygotowanie do badania, albo po prostu podyktować swój pomiar (np. "Pulsi, zapisz 120 na 80 puls 68"). O czym chciałbyś pogadać?'
             : lang === 'it'
-            ? 'Buongiorno! Sono il tuo Assistente della Salute. Puoi dettare la tua misurazione della pressione (es. "120 su 80 battiti 70") o porre qualsiasi domanda.'
+            ? 'Ciao! Mi chiamo Pulsi — sono il tuo assistente in Pulsivio. Puoi dettare la tua misurazione (es. "120 su 80 pulsazioni 70") o fare qualsiasi domanda.'
             : lang === 'de'
-            ? 'Guten Tag! Ich bin Ihr Gesundheitsassistent. Sie können Ihren Blutdruckwert diktieren (z. B. "120 zu 80 Puls 70") oder Fragen stellen.'
+            ? 'Hallo! Ich heiße Pulsi — Ihr Assistent in Pulsivio. Sie können Ihren Blutdruckwert diktieren (z. B. "120 zu 80 Puls 70") oder Fragen stellen.'
             : lang === 'es'
-            ? '¡Hola! Soy tu Asistente de Salud. Puedes dictar tu medición (ej: "120 sobre 80 pulso 70") o hacer cualquier pregunta.'
-            : 'Hello! I am your Health Assistant. You can dictate your blood pressure reading (e.g., "120 over 80 pulse 70") or ask health questions.',
+            ? '¡Hola! Me llamo Pulsi — soy tu asistente en Pulsivio. Puedes dictar tu medición (ej: "120 sobre 80 pulso 70") o hacer preguntas.'
+            : 'Hello! My name is Pulsi — I am your personal assistant in Pulsivio. You can chat with me, dictate your blood pressure reading (e.g., "120 over 80 pulse 70"), or ask health questions.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -131,7 +131,17 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert('Rozpoznawanie mowy nie jest w pełni wspierane w tej przeglądarce. Możesz wpisać wiadomość w polu poniżej.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: String(Date.now()),
+          sender: 'assistant',
+          text: lang === 'pl'
+            ? 'Twoja przeglądarka nie obsługuje bezpośredniego nasłuchiwania mikrofonem (lub brak uprawnień). Możesz śmiało wpisać swój wynik w polu poniżej (np. „120 na 80 puls 70”), a ja go dla Ciebie zapiszę!'
+            : 'Speech recognition is not available in this browser. You can type your measurement below (e.g. "120/80 pulse 70").',
+          timestamp: new Date(),
+        },
+      ]);
       return;
     }
 
@@ -279,11 +289,16 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                {t.assistantTitle}
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                  Pulsi
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                  Asystent AI
+                </span>
+              </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Dyktuj pomiary i pytaj o zdrowie
+                Porozmawiaj z Pulsim lub podyktuj pomiar głosem
               </p>
             </div>
           </div>
@@ -291,7 +306,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -387,16 +402,25 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
 
         {/* Quick Sample Questions (Wrapped smoothly for mobile) */}
         <div className="border-t border-slate-100 bg-slate-50/50 p-2.5 dark:border-slate-800 dark:bg-slate-800/30">
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-            {t.quickQuestionsTitle}
+          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
+            <span>{lang === 'pl' ? 'Porozmawiaj z Pulsim lub wybierz temat:' : t.quickQuestionsTitle}</span>
+            <span className="text-[10px] text-rose-600 font-bold">1-kliknięcie</span>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {[t.qq1, t.qq2, t.qq3, t.qq4].map((q, idx) => (
+          <div className="flex flex-wrap gap-1.5">
+            {(lang === 'pl'
+              ? [
+                  'Cześć Pulsi! Jak się masz?',
+                  'Pulsi, zapisz 120 na 80 puls 68',
+                  'Pulsi, jak przygotować się do pomiaru?',
+                  'Pulsi, co to jest ciśnienie skurczowe i rozkurczowe?',
+                ]
+              : [t.qq1, t.qq2, t.qq3, t.qq4]
+            ).map((q, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleSendMessage(q)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 truncate max-w-full"
+                className="rounded-lg border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors cursor-pointer"
               >
                 {q}
               </button>
@@ -455,7 +479,12 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
             </button>
           </form>
 
-          <p className="mt-2 text-[10px] text-center text-slate-400 dark:text-slate-500">
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-lg border border-emerald-200/60 dark:border-emerald-900/60">
+            <span className="font-bold">🔒 Prywatność:</span>
+            <span>Mikrofon działa TYLKO po kliknięciu w ikonę. Pulsi nie słucha w tle ani nie nagrywa rozmów.</span>
+          </div>
+
+          <p className="mt-1 text-[10px] text-center text-slate-400 dark:text-slate-500">
             {t.assistantDisclaimer}
           </p>
         </div>

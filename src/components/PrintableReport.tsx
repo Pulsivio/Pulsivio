@@ -654,7 +654,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               type="button"
               onClick={handleExportCSV}
               id="print-report-csv-btn"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
             >
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
               <span>Pobierz CSV</span>
@@ -664,7 +664,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               type="button"
               onClick={handleSendEmail}
               id="print-report-email-btn"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
             >
               <Mail className="h-4 w-4 text-blue-600" />
               <span>Wyślij e-mail</span>
@@ -674,7 +674,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               type="button"
               onClick={handleCopySummary}
               id="print-report-copy-btn"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
             >
               {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Share2 className="h-4 w-4 text-indigo-600" />}
               <span>{copied ? 'Skopiowano!' : 'Kopiuj'}</span>
@@ -694,7 +694,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               <button
                 type="button"
                 onClick={onToggleDarkMode}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 dark:bg-slate-800 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-98 transition-all cursor-pointer"
                 title="Przełącz motyw"
               >
                 {isDarkMode ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-indigo-500" />}
@@ -866,8 +866,8 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
             id="report-filter-all-btn"
             className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
               periodFilter === 'all'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60'
+                ? 'bg-slate-900 text-white dark:bg-slate-700 dark:text-white shadow-xs'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60'
             }`}
           >
             Wszystkie ({measurements.length})
@@ -883,7 +883,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               id="view-mode-daily-btn"
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'daily'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-slate-200 dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -897,7 +897,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
               id="view-mode-detailed-btn"
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'detailed'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-slate-200 dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -912,7 +912,7 @@ export const PrintableReport: React.FC<PrintableReportProps> = ({
             className={`px-3 py-1.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
               isDoctorLargeFont
                 ? 'bg-amber-100 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
             }`}
             title="Powiększa cyfry w tabeli dla wygodnego czytania z biurka"
           >

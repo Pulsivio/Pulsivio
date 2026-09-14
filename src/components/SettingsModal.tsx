@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { X, Globe, UserCheck, Type, Sun, Moon, ShieldCheck, Check, Phone, Stethoscope, ChevronRight, UserPlus, FileSpreadsheet, Heart, ShieldAlert, Crown, Sparkles, Smartphone, Trash2, RotateCcw, CheckCircle2, Download, Upload, FileJson, Coffee, ExternalLink, LogIn, LogOut, User, QrCode } from 'lucide-react';
+import { X, Globe, UserCheck, Type, Sun, Moon, ShieldCheck, Check, Phone, Stethoscope, ChevronRight, UserPlus, FileSpreadsheet, Heart, ShieldAlert, Crown, Sparkles, Smartphone, Trash2, RotateCcw, CheckCircle2, Download, Upload, FileJson, Coffee, ExternalLink, LogIn, LogOut, User, QrCode, Lock, Key, Image, Share2 } from 'lucide-react';
 import { Language, Measurement, UserProfile, GoogleAccount } from '../types';
 import { translations } from '../i18n';
+import { getIsAdmin, setIsAdmin } from '../utils/storage';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ interface SettingsModalProps {
   currentAvatar?: string;
   onOpenAvatarSelector?: () => void;
   onImportBackup?: (data: { measurements: Measurement[]; profile?: UserProfile }) => void;
+  onOpenSocialKit?: () => void;
+  onOpenLandingPage?: () => void;
 }
 
 const languages: { code: Language; label: string; flag: string; desc: string }[] = [
@@ -66,6 +69,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentAvatar,
   onOpenAvatarSelector,
   onImportBackup,
+  onOpenSocialKit,
+  onOpenLandingPage,
 }) => {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearedSuccess, setClearedSuccess] = useState(false);
@@ -76,6 +81,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [manualGoogleEmail, setManualGoogleEmail] = useState('');
   const [manualGoogleName, setManualGoogleName] = useState('');
   const [showDonationQR, setShowDonationQR] = useState(false);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => getIsAdmin());
+  const [adminPinInput, setAdminPinInput] = useState<string>('');
+  const [adminPinError, setAdminPinError] = useState<boolean>(false);
+  const [showAdminPinPrompt, setShowAdminPinPrompt] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -84,6 +93,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const caregivers = profile?.caregivers || [];
   const primaryCaregiver = caregivers.find((c) => c.isPrimary) || caregivers[0] || null;
   const googleUser = profile?.googleAccount || null;
+
+  const isRecognizedOwner =
+    Boolean(googleUser?.email?.toLowerCase().includes('pirat123451')) ||
+    isAdminUnlocked;
+
+  const handleUnlockAdminPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPinInput.trim() === '1234' || adminPinInput.trim().toLowerCase() === 'pirat123451') {
+      setIsAdmin(true);
+      setIsAdminUnlocked(true);
+      setAdminPinError(false);
+      setShowAdminPinPrompt(false);
+    } else {
+      setAdminPinError(true);
+    }
+  };
 
   const handleGoogleSignIn = () => {
     setIsGoogleSigningIn(true);
@@ -204,7 +229,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               title="Zmień awatar aplikacji"
             >
               <img
-                src={currentAvatar || '/pulsify_avatar.png'}
+                src={currentAvatar || '/avatars/pulsivio_official_brand.jpg'}
                 alt="Pulsivio"
                 referrerPolicy="no-referrer"
                 className="h-full w-full object-cover"
@@ -295,7 +320,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={handleGoogleSignOut}
-                  className="inline-flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shrink-0"
                   title={lang === 'pl' ? 'Wyloguj konto Google' : 'Disconnect Google'}
                 >
                   <LogOut className="h-3.5 w-3.5 text-slate-500" />
@@ -306,7 +331,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isGoogleSigningIn}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-600 shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -368,6 +393,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {lang === 'pl' ? 'Anuluj' : 'Cancel'}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Quick 1-Click login for Project Owner */}
+            {!googleUser && (
+              <div className="pt-1 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-700/60 mt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveGoogleAccount('pirat123451@gmail.com', 'Właściciel Pulsivio')}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>Zaloguj 1-kliknięciem jako Właściciel (pirat123451@gmail.com)</span>
+                </button>
               </div>
             )}
           </div>
@@ -467,61 +506,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* SECTION: Postaw kawę twórcy (Polska: BuyCoffee.to / Zagranica: BuyMeACoffee) */}
-          <div className="rounded-2xl border-2 border-emerald-200/80 dark:border-emerald-800/70 bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-amber-50/40 p-3.5 dark:from-slate-800 dark:via-slate-800 dark:to-emerald-950/30 space-y-2.5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-600 text-white shadow-xs shrink-0">
-                  <Coffee className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight truncate">
-                      {lang === 'pl' ? 'Podoba Ci się Pulsivio? Wesprzyj projekt ☕' : 'Like Pulsivio? Support the creator ☕'}
-                    </h3>
-                    <span className="rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-1.5 py-0.2">
-                      PL + Świat
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
-                    {lang === 'pl' ? 'Wspieraj rozwój darmowej aplikacji dla zdrowego serca. BLIK lub karta.' : 'Support development of this free health app. BLIK or Card.'}
-                  </p>
+          <div className="rounded-xl border border-emerald-300/80 dark:border-emerald-800/70 bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-amber-50/30 p-3 dark:from-slate-800 dark:via-slate-800 dark:to-emerald-950/30 space-y-2.5 shadow-xs">
+            {/* Header: Title and subtitle on TOP */}
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-amber-500 via-orange-500 to-emerald-600 text-white shadow-xs shrink-0 mt-0.5">
+                <Coffee className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-tight">
+                    {lang === 'pl' ? 'Podoba Ci się Pulsivio? Wesprzyj projekt ☕' : 'Like Pulsivio? Support the creator ☕'}
+                  </h3>
+                  <span className="rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-1.5 py-0.2">
+                    PL + Świat
+                  </span>
                 </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug mt-0.5">
+                  {lang === 'pl' ? 'Wspieraj rozwój darmowej aplikacji dla serca. Płatność BLIK lub karta.' : 'Support development of this free health app. BLIK or Card.'}
+                </p>
               </div>
+            </div>
 
-              {/* Dwa eleganckie przyciski: BLIK (Polska) i Global (Karta/Apple Pay) + Przycisk Kodów QR */}
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                <a
-                  href="https://buycoffee.to/pulsivio"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-2.5 py-1.5 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
-                  title="Wpłata przez BLIK (Polska)"
-                >
-                  <span>🇵🇱 BLIK</span>
-                  <ExternalLink className="h-3 w-3 opacity-80" />
-                </a>
+            {/* Buttons underneath the text */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
+              <a
+                href="https://buycoffee.to/pulsivio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-1.5 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95 text-center"
+                title="Wpłata przez BLIK (Polska)"
+              >
+                <span>🇵🇱 BLIK</span>
+                <ExternalLink className="h-3 w-3 opacity-80" />
+              </a>
 
-                <a
-                  href="https://buymeacoffee.com/pulsivio"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white px-2.5 py-1.5 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
-                  title="Wpłata kartą / Apple Pay / Zagranica"
-                >
-                  <span>🌍 Karta / Apple Pay</span>
-                  <ExternalLink className="h-3 w-3 opacity-80" />
-                </a>
+              <a
+                href="https://buymeacoffee.com/pulsivio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white px-3 py-1.5 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95 text-center"
+                title="Wpłata kartą / Apple Pay / Zagranica"
+              >
+                <span>🌍 Karta / Apple Pay</span>
+                <ExternalLink className="h-3 w-3 opacity-80" />
+              </a>
 
-                <button
-                  type="button"
-                  onClick={() => setShowDonationQR(!showDonationQR)}
-                  className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 px-2 py-1.5 text-xs font-bold shadow-2xs hover:bg-emerald-50 dark:hover:bg-slate-700 transition-all cursor-pointer"
-                  title={lang === 'pl' ? 'Pokaż kody QR do zeskanowania telefonem' : 'Show QR codes'}
-                >
-                  <QrCode className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">{showDonationQR ? (lang === 'pl' ? 'Ukryj QR' : 'Hide QR') : (lang === 'pl' ? 'Kody QR' : 'QR Codes')}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowDonationQR(!showDonationQR)}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-100/70 hover:bg-emerald-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 text-xs font-bold shadow-2xs transition-all cursor-pointer text-center"
+                title={lang === 'pl' ? 'Pokaż kody QR do zeskanowania telefonem' : 'Show QR codes'}
+              >
+                <QrCode className="h-3.5 w-3.5" />
+                <span>{showDonationQR ? (lang === 'pl' ? 'Ukryj QR' : 'Hide QR') : (lang === 'pl' ? 'Kody QR' : 'QR Codes')}</span>
+              </button>
             </div>
 
             {/* Rozwijany panel z 2 kodami QR do zeskanowania telefonem */}
@@ -687,7 +725,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={onOpenDoctorShare}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold hover:bg-slate-800 cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-[11px] font-bold cursor-pointer shrink-0 transition-colors"
                 >
                   <span>{lang === 'pl' ? 'Udostępnij' : 'Share'}</span>
                   <ChevronRight className="h-3 w-3" />
@@ -842,7 +880,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={onToggleDarkMode}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-2xs cursor-pointer transition-all"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 shadow-2xs cursor-pointer transition-all"
               >
                 {isDarkMode ? (
                   <>
@@ -906,7 +944,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 id="import-backup-btn"
-                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50/80 dark:bg-slate-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-98"
               >
                 <Upload className="h-3.5 w-3.5" />
                 <span>{lang === 'pl' ? 'Wczytaj plik kopii' : 'Import Backup'}</span>
@@ -1005,6 +1043,188 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
 
+          {/* SECTION: Panel Właściciela & Administratora (Widoczny wyłącznie dla pirat123451@gmail.com lub z PINem) */}
+          {isRecognizedOwner ? (
+            <div className="rounded-2xl border-2 border-amber-400 dark:border-amber-600 bg-gradient-to-br from-amber-50 via-white to-amber-100/50 dark:from-slate-900 dark:via-slate-850 dark:to-amber-950/40 p-4 space-y-3 shadow-md">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white shadow-sm shrink-0">
+                    <Crown className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs sm:text-sm font-black text-amber-950 dark:text-amber-100 uppercase tracking-wide">
+                        Panel Właściciela & Twórcy Pulsivio
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white font-black text-[9px] uppercase">
+                        Aktywny Właściciel
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                      Zweryfikowano: <strong>{googleUser?.email || 'Klucz Administratora'}</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Clarification answering the user's question */}
+              <div className="rounded-xl bg-amber-100/70 dark:bg-amber-950/60 p-2.5 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                <strong>💡 Jak to działa, że inni tego nie widzą?</strong>
+                <p className="mt-0.5">
+                  Aplikacja weryfikuje Twoją tożsamość na podstawie konta Google (<strong>pirat123451@gmail.com</strong>) oraz uprawnień administratora. Gdy ktokolwiek inny wchodzi na stronę, aplikacja traktuje go jako zwykłego pacjenta — nie widzi on tych przycisków, nie może podmieniać logotypu ani Twoich linków afiliacyjnych.
+                </p>
+              </div>
+
+              {/* Owner Action Buttons Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {onOpenAvatarSelector && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAvatarSelector();
+                    }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 hover:border-amber-500 text-left transition-all shadow-2xs cursor-pointer group"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Image className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
+                        Globalne Logo Aplikacji
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                        Wgraj nowe zdjęcie dla każdego
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenRecommendedDevices && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenRecommendedDevices();
+                    }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 hover:border-amber-500 text-left transition-all shadow-2xs cursor-pointer group"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Stethoscope className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
+                        Linki Afiliacyjne (Prowizje)
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                        Twoje tagi partnerskie i modele
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenLandingPage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenLandingPage();
+                    }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 hover:border-amber-500 text-left transition-all shadow-2xs cursor-pointer group"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Sparkles className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
+                        Prezentacja & Post na FB
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                        Gotowy tekst na facebook.com/pulsivio
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenSocialKit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenSocialKit();
+                    }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 hover:border-amber-500 text-left transition-all shadow-2xs cursor-pointer group"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-sky-100 dark:bg-sky-950 text-sky-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Share2 className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
+                        Materiały Graficzne & Banery
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                        Pobierz avatary i grafiki w HD
+                      </span>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Discrete unlock trigger for owner if not logged in */
+            <div className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-xs">
+              {!showAdminPinPrompt ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPinPrompt(true)}
+                  className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-[11px] cursor-pointer"
+                >
+                  <Lock className="h-3 w-3" />
+                  <span>Jesteś właścicielem projektu Pulsivio? Odblokuj panel administratora</span>
+                </button>
+              ) : (
+                <form onSubmit={handleUnlockAdminPin} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Key className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Wprowadź kod PIN właściciela:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPinPrompt(false)}
+                      className="text-[10px] text-slate-400 hover:underline cursor-pointer"
+                    >
+                      Anuluj
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Wpisz PIN (np. 1234)"
+                      value={adminPinInput}
+                      onChange={(e) => {
+                        setAdminPinInput(e.target.value);
+                        setAdminPinError(false);
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer shadow-xs"
+                    >
+                      Odblokuj
+                    </button>
+                  </div>
+                  {adminPinError && (
+                    <p className="text-[10px] text-rose-500 font-bold">
+                      Nieprawidłowy kod PIN. Wskazówka: Domyślny kod to 1234 lub zaloguj się przez konto pirat123451@gmail.com.
+                    </p>
+                  )}
+                </form>
+              )}
+            </div>
+          )}
+
           {/* Privacy & Safe Notice */}
           <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs">
             <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -1043,7 +1263,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-extrabold text-sm hover:bg-slate-800 dark:hover:bg-slate-100 shadow-xs cursor-pointer transition-all active:scale-95"
+            className="px-6 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 dark:border dark:border-slate-700 text-white font-extrabold text-sm hover:bg-slate-800 dark:hover:bg-slate-700 shadow-xs cursor-pointer transition-all active:scale-95"
           >
             {t.doneSave || 'Gotowe / Zapisz'}
           </button>
