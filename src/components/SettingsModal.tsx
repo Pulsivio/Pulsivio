@@ -623,6 +623,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* SECTION: Oficjalny profil na Facebooku */}
+          <div className="rounded-2xl border-2 border-blue-200 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-950/30 p-3.5 space-y-2 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1877F2] text-white shadow-xs">
+                  <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                </span>
+                <div className="min-w-0">
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                    {lang === 'pl' ? 'Oficjalny profil Pulsivio na Facebooku' : 'Official Pulsivio Facebook Page'}
+                  </h4>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    facebook.com/pulsivio • {lang === 'pl' ? 'Aktualności, porady i społeczność użytkowników' : 'News, cardiovascular health tips & community'}
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://www.facebook.com/pulsivio/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-blue-600 text-white font-bold text-xs shadow-xs transition-all shrink-0 cursor-pointer active:scale-95"
+              >
+                <span>{lang === 'pl' ? 'Odwiedź Facebook' : 'Visit Facebook'}</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
           
           {/* SECTION: Opiekunowie i kontakty SOS */}
           <div className="rounded-2xl border border-blue-200/80 bg-blue-50/40 p-3.5 dark:border-blue-900/50 dark:bg-blue-950/20 space-y-2.5">

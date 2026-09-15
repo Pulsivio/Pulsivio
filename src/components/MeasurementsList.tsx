@@ -926,170 +926,244 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
                 </div>
               </div>
 
-              {/* 7-Day Calendar Strip: Poniedziałek -> Niedziela
-                  Jasny jeśli jest wpis, na szaro gdy 0 wpisów */}
-              <div className="space-y-1 pt-0.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                  <span>{lang === 'pl' ? 'Tydzień dzień po dniu:' : 'Days of the week:'}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    {lang === 'pl' ? 'Szary: 0 wpisów • Błękitny: pomiar zapisany' : 'Gray: 0 • Blue: has readings'}
-                  </span>
-                </div>
+              {/* 7-Dniowy Harmonogram Tygodniowy z Osią Czasu po LEWEJ STRONIE */}
+              <div className="pt-2 border-t border-sky-200/80 dark:border-slate-800">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+                  
+                  {/* LEWA STRONA: OŚ CZASU 7 DNI (Poniedziałek -> Niedziela) */}
+                  <div className="lg:col-span-6 xl:col-span-5 space-y-2">
+                    <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      <span className="flex items-center gap-1.5">
+                        <CalendarDays className="h-4 w-4 text-sky-500 shrink-0" />
+                        <span>{lang === 'pl' ? 'Oś czasu 7 dni (Pn – Nd):' : '7-Day Timeline (Mon – Sun):'}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {calendarWeek.startStr} – {calendarWeek.endStr}
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                  {calendarWeek.days.map((day, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        if (day.hasData) {
-                          setExpandedDays((prev) => ({ ...prev, [day.dateStr]: true }));
-                        } else if (onAddNewToDate) {
-                          onAddNewToDate(day.dateStr);
-                        }
-                      }}
-                      className={`group relative flex flex-col items-center justify-between py-2 sm:py-2.5 px-0.5 sm:px-1 rounded-xl sm:rounded-2xl border-2 text-center transition-all cursor-pointer select-none ${
-                        day.hasData
-                          ? 'bg-gradient-to-b from-sky-400 via-sky-500 to-blue-600 text-white border-sky-300 shadow-sm ring-2 ring-sky-300/80 dark:ring-sky-500/60 hover:scale-102 hover:shadow-md'
-                          : 'bg-slate-100/90 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-200/60'
-                      }`}
-                      title={`${day.name} (${day.shortDate}): ${day.count} ${lang === 'pl' ? 'wpisów' : 'readings'}${!day.hasData ? ' - Kliknij, aby dodać pomiar' : ''}`}
-                    >
-                      {day.isToday && (
-                        <span className={`absolute -top-1.5 sm:-top-2 px-1 sm:px-1.5 py-0.2 rounded-full text-[8px] font-black uppercase tracking-wider shadow-2xs ${
-                          day.hasData ? 'bg-amber-300 text-slate-950 ring-1 ring-white' : 'bg-sky-500 text-white'
-                        }`}>
-                          Dziś
+                    <div className="flex flex-col gap-1.5">
+                      {calendarWeek.days.map((day, idx) => {
+                        const daySys = day.hasData ? Math.round(day.items.reduce((a, b) => a + b.systolic, 0) / day.items.length) : null;
+                        const dayDia = day.hasData ? Math.round(day.items.reduce((a, b) => a + b.diastolic, 0) / day.items.length) : null;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`group flex items-center justify-between p-2 sm:p-2.5 rounded-xl border-2 transition-all ${
+                              day.isToday
+                                ? 'border-sky-400 bg-sky-50/80 dark:bg-sky-950/50 dark:border-sky-500 shadow-xs'
+                                : day.hasData
+                                ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-sky-300 dark:hover:border-sky-700'
+                                : 'border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30'
+                            }`}
+                          >
+                            {/* Lewa część: Znaczek dnia, Nazwa, Data */}
+                            <div
+                              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                              onClick={() => {
+                                if (day.hasData) {
+                                  setExpandedDays((prev) => ({ ...prev, [day.dateStr]: true }));
+                                  const el = document.getElementById(`day-card-${day.dateStr}`);
+                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                } else if (onAddNewToDate) {
+                                  onAddNewToDate(day.dateStr);
+                                }
+                              }}
+                            >
+                              <span
+                                className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl font-black text-xs sm:text-sm shadow-xs ${
+                                  day.hasData
+                                    ? 'bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sky-500/30'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                {day.letter}
+                              </span>
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                                    {day.name}
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                    {day.shortDate}
+                                  </span>
+                                  {day.isToday && (
+                                    <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-2xs">
+                                      {lang === 'pl' ? 'Dziś' : 'Today'}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
+                                  {day.hasData ? (
+                                    <span className="font-semibold text-sky-700 dark:text-sky-300">
+                                      {day.count} {lang === 'pl' ? (day.count === 1 ? 'wpis' : day.count < 5 ? 'wpisy' : 'wpisów') : 'readings'} • śr. {daySys}/{dayDia} mmHg
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 dark:text-slate-500">
+                                      {lang === 'pl' ? '0 wpisów (brak pomiaru)' : '0 readings'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Prawa strona: Przycisk akcji */}
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              {day.hasData ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpandedDays((prev) => ({ ...prev, [day.dateStr]: true }));
+                                    const el = document.getElementById(`day-card-${day.dateStr}`);
+                                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/80 border border-sky-200 dark:border-sky-800 text-[11px] font-bold text-sky-700 dark:text-sky-300 hover:bg-sky-100 transition-colors cursor-pointer"
+                                >
+                                  {lang === 'pl' ? 'Pokaż' : 'View'}
+                                </button>
+                              ) : onAddNewToDate ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onAddNewToDate(day.dateStr)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-sky-500 hover:text-white dark:hover:bg-sky-600 text-slate-600 dark:text-slate-300 text-[11px] font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                                  title={lang === 'pl' ? `Dodaj pomiar: ${day.name} (${day.shortDate})` : 'Add reading'}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  <span>{lang === 'pl' ? 'Dodaj' : 'Add'}</span>
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* PRAWA STRONA: PORY DNIA, SKOK PORANNY I NORMA PTNT */}
+                  <div className="lg:col-span-6 xl:col-span-7 space-y-2.5">
+                    <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      <span className="flex items-center gap-1.5">
+                        <Activity className="h-4 w-4 text-indigo-500 shrink-0" />
+                        <span>{lang === 'pl' ? 'Rozkład pór dnia i wskaźniki tygodnia:' : 'Time of Day & Weekly Norms:'}</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Rano - Amber / Golden Sunrise */}
+                      <div className="bg-amber-50/90 dark:bg-amber-950/60 p-2.5 rounded-xl border-2 border-amber-200 dark:border-amber-800 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <SunMedium className="h-4 w-4 text-amber-500 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 block leading-tight truncate">
+                              {t.morningLabel || (lang === 'pl' ? 'Rano' : 'Morning')}
+                            </span>
+                            <span className="text-[9px] text-amber-700/80 dark:text-amber-400 block leading-none">
+                              {weekStats.mCount} {lang === 'pl' ? 'pom.' : 'rd.'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0">
+                          {weekStats.mSys ? `${weekStats.mSys}/${weekStats.mDia}` : '--/--'}
                         </span>
+                      </div>
+
+                      {/* Wieczór - Twilight Indigo */}
+                      <div className="bg-indigo-50/90 dark:bg-indigo-950/60 p-2.5 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Sunset className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 block leading-tight truncate">
+                              {t.eveningLabel || (lang === 'pl' ? 'Wieczór' : 'Evening')}
+                            </span>
+                            <span className="text-[9px] text-indigo-700/80 dark:text-indigo-400 block leading-none">
+                              {weekStats.eCount} {lang === 'pl' ? 'pom.' : 'rd.'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0">
+                          {weekStats.eSys ? `${weekStats.eSys}/${weekStats.eDia}` : '--/--'}
+                        </span>
+                      </div>
+
+                      {/* Skok poranny (Rano - Wieczór) */}
+                      <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block leading-tight truncate">
+                              {lang === 'pl' ? 'Skok poranny' : 'Morning surge'}
+                            </span>
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 block leading-none">
+                              {lang === 'pl' ? 'Rano - Wieczór' : 'AM - PM'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-xs sm:text-sm font-black shrink-0 ${
+                          weekStats.morningSurge !== null && weekStats.morningSurge >= 15
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-slate-900 dark:text-white'
+                        }`}>
+                          {weekStats.morningSurge !== null
+                            ? `${weekStats.morningSurge >= 0 ? '+' : ''}${weekStats.morningSurge}`
+                            : '--'}{' '}
+                          <span className="text-[9px] font-normal text-slate-400">mmHg</span>
+                        </span>
+                      </div>
+
+                      {/* W normie domowej PTNT (<135/85) */}
+                      <div className="bg-emerald-50/90 dark:bg-emerald-950/60 p-2.5 rounded-xl border-2 border-emerald-200 dark:border-emerald-800 flex items-center justify-between shadow-2xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <div className="truncate">
+                            <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block leading-tight truncate">
+                              {lang === 'pl' ? 'W normie PTNT' : 'In PTNT norm'}
+                            </span>
+                            <span className="text-[9px] text-emerald-700/80 dark:text-emerald-400 block leading-none">
+                              &lt;135/85 mmHg
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                          {weekStats.normPercent}%
+                        </span>
+                      </div>
+
+                      {/* Południe - Azure (tylko jeśli są pomiary) */}
+                      {weekStats.nSys !== null && (
+                        <div className="bg-sky-50/90 dark:bg-sky-950/60 p-2.5 rounded-xl border-2 border-sky-300 dark:border-sky-700 flex items-center justify-between shadow-2xs col-span-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Sun className="h-4 w-4 text-sky-500 shrink-0" />
+                            <span className="text-[11px] font-bold text-sky-800 dark:text-sky-300 truncate">
+                              {t.noonLabel || (lang === 'pl' ? 'Południe' : 'Noon')} ({weekStats.nCount} pom.)
+                            </span>
+                          </div>
+                          <span className="text-xs sm:text-sm font-black text-sky-600 dark:text-sky-400 shrink-0">
+                            {weekStats.nSys}/{weekStats.nDia}
+                          </span>
+                        </div>
                       )}
-                      <span className="text-xs sm:text-sm font-black leading-none">{day.letter}</span>
-                      <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${
-                        day.hasData ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
-                      }`}>
-                        {day.shortDate}
-                      </span>
-                      <span className={`mt-1 text-[9px] sm:text-[10px] font-black rounded-md px-1 sm:px-1.5 py-0.5 leading-none ${
-                        day.hasData
-                          ? 'bg-white/25 text-white'
-                          : 'bg-slate-200/70 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
-                      }`}>
-                        {day.count > 0 ? `${day.count} ${lang === 'pl' ? (day.count === 1 ? 'wpis' : 'wpisy') : ''}` : (lang === 'pl' ? '0' : '0')}
-                      </span>
-                    </button>
-                  ))}
+
+                      {/* Dodatkowy - Violet (tylko jeśli są pomiary) */}
+                      {weekStats.xSys && (
+                        <div className="bg-purple-50/90 dark:bg-purple-950/60 p-2.5 rounded-xl border-2 border-purple-200 dark:border-purple-800 flex items-center justify-between shadow-2xs col-span-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <PlusCircle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                            <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 truncate">
+                              {t.extraLabel || (lang === 'pl' ? 'Dodatkowy' : 'Extra')} ({weekStats.xCount} pom.)
+                            </span>
+                          </div>
+                          <span className="text-xs sm:text-sm font-black text-purple-600 dark:text-purple-400 shrink-0">
+                            {weekStats.xSys}/{weekStats.xDia}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
-              </div>
-
-              {/* Time of Day Breakdown & Clinical Norms (Zero duplication with top tiles) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-sky-200/80 dark:border-slate-800">
-                {/* Rano - Amber / Golden Sunrise */}
-                <div className="bg-amber-50/90 dark:bg-amber-950/60 px-2.5 py-2 rounded-xl border-2 border-amber-200 dark:border-amber-800 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <SunMedium className="h-4 w-4 text-amber-500 shrink-0" />
-                    <div className="truncate">
-                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 block leading-tight truncate">
-                        {t.morningLabel || (lang === 'pl' ? 'Rano' : 'Morning')}
-                      </span>
-                      <span className="text-[9px] text-amber-700/80 dark:text-amber-400 block leading-none">
-                        {weekStats.mCount} {lang === 'pl' ? 'pom.' : 'rd.'}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0">
-                    {weekStats.mSys ? `${weekStats.mSys}/${weekStats.mDia}` : '--/--'}
-                  </span>
-                </div>
-
-                {/* Wieczór - Twilight Indigo */}
-                <div className="bg-indigo-50/90 dark:bg-indigo-950/60 px-2.5 py-2 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Sunset className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                    <div className="truncate">
-                      <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300 block leading-tight truncate">
-                        {t.eveningLabel || (lang === 'pl' ? 'Wieczór' : 'Evening')}
-                      </span>
-                      <span className="text-[9px] text-indigo-700/80 dark:text-indigo-400 block leading-none">
-                        {weekStats.eCount} {lang === 'pl' ? 'pom.' : 'rd.'}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0">
-                    {weekStats.eSys ? `${weekStats.eSys}/${weekStats.eDia}` : '--/--'}
-                  </span>
-                </div>
-
-                {/* Skok poranny (Rano - Wieczór) */}
-                <div className="bg-slate-50 dark:bg-slate-800 px-2.5 py-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                    <div className="truncate">
-                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block leading-tight truncate">
-                        {lang === 'pl' ? 'Skok poranny' : 'Morning surge'}
-                      </span>
-                      <span className="text-[9px] text-slate-500 dark:text-slate-400 block leading-none">
-                        {lang === 'pl' ? 'Rano - Wieczór' : 'AM - PM'}
-                      </span>
-                    </div>
-                  </div>
-                  <span className={`text-xs sm:text-sm font-black shrink-0 ${
-                    weekStats.morningSurge !== null && weekStats.morningSurge >= 15
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-slate-900 dark:text-white'
-                  }`}>
-                    {weekStats.morningSurge !== null
-                      ? `${weekStats.morningSurge >= 0 ? '+' : ''}${weekStats.morningSurge}`
-                      : '--'}{' '}
-                    <span className="text-[9px] font-normal text-slate-400">mmHg</span>
-                  </span>
-                </div>
-
-                {/* W normie domowej PTNT (<135/85) */}
-                <div className="bg-emerald-50/90 dark:bg-emerald-950/60 px-2.5 py-2 rounded-xl border-2 border-emerald-200 dark:border-emerald-800 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <div className="truncate">
-                      <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block leading-tight truncate">
-                        {lang === 'pl' ? 'W normie PTNT' : 'In PTNT norm'}
-                      </span>
-                      <span className="text-[9px] text-emerald-700/80 dark:text-emerald-400 block leading-none">
-                        &lt;135/85 mmHg
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
-                    {weekStats.normPercent}%
-                  </span>
-                </div>
-
-                {/* Południe - Azure (tylko jeśli są pomiary) */}
-                {weekStats.nSys !== null && (
-                  <div className="bg-sky-50/90 dark:bg-sky-950/60 px-2.5 py-2 rounded-xl border-2 border-sky-300 dark:border-sky-700 flex items-center justify-between shadow-2xs col-span-2 sm:col-span-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Sun className="h-4 w-4 text-sky-500 shrink-0" />
-                      <span className="text-[11px] font-bold text-sky-800 dark:text-sky-300 truncate">
-                        {t.noonLabel || (lang === 'pl' ? 'Południe' : 'Noon')} ({weekStats.nCount} pom.)
-                      </span>
-                    </div>
-                    <span className="text-xs sm:text-sm font-black text-sky-600 dark:text-sky-400 shrink-0">
-                      {weekStats.nSys}/{weekStats.nDia}
-                    </span>
-                  </div>
-                )}
-
-                {/* Dodatkowy - Violet (tylko jeśli są pomiary) */}
-                {weekStats.xSys && (
-                  <div className="bg-purple-50/90 dark:bg-purple-950/60 px-2.5 py-2 rounded-xl border-2 border-purple-200 dark:border-purple-800 flex items-center justify-between shadow-2xs col-span-2 sm:col-span-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <PlusCircle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                      <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 truncate">
-                        {t.extraLabel || (lang === 'pl' ? 'Dodatkowy' : 'Extra')} ({weekStats.xCount} pom.)
-                      </span>
-                    </div>
-                    <span className="text-xs sm:text-sm font-black text-purple-600 dark:text-purple-400 shrink-0">
-                      {weekStats.xSys}/{weekStats.xDia}
-                    </span>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -1137,7 +1211,8 @@ export const MeasurementsList: React.FC<MeasurementsListProps> = ({
             return (
               <div
                 key={day.date}
-                className="overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900 transition-all hover:shadow-sm"
+                id={`day-card-${day.date}`}
+                className="overflow-hidden rounded-2xl border-2 border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900 transition-all hover:shadow-sm scroll-mt-20 border-l-4 border-l-sky-500"
               >
                 {/* Day Header Bar: Clickable to enter day details */}
                 <div

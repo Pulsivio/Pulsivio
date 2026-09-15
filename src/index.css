@@ -67,6 +67,22 @@
   height: 0;
 }
 
+/* Mobile AdSense & Playable Ad Safe-Area Fixes */
+.google-interstitial-overlay,
+ins.adsbygoogle-noablate,
+iframe[id*="google_ads_iframe"] {
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+}
+
+#mobile-ad-escape-root {
+  pointer-events: auto;
+}
+
+#mobile-ad-escape-btn-wrapper {
+  touch-action: manipulation;
+}
+
 @media print {
   @page {
     size: A4 portrait;
