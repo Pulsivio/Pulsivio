@@ -1,6 +1,8 @@
 {
-  "name": "Pulsivio",
-  "description": "Pulsivio - Nowoczesny dziennik pomiarów ciśnienia krwi i tętna z dedykowanym trybem seniora, asystentem głosowym AI, automatyczną synchronizacją PC-telefon, wydrukiem A4 dla lekarza oraz pełnym dopasowaniem do ekranu każdego smartfona.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "Widget OBS KickStats chat pro",
+  "description": "Profesjonalny panel statystyk czatu na żywo z Kick.com dedykowany dla OBS Studio z systemem licencji i filtrowaniem botów",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

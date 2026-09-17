@@ -1,409 +1,136 @@
 import express from "express";
 import path from "path";
-import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json());
 
-// Helper for Gemini AI
-function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    return null;
+// Enable CORS and allow OBS CEF browser source / custom dock requests
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
-}
+  next();
+});
 
-import fs from "fs";
-
-// Storage directory for cross-device sync and admin settings
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "sync_data.json");
-const AFFILIATE_FILE = path.join(DATA_DIR, "affiliate_config.json");
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-let syncStore: Record<string, { measurements: any[]; profile?: any; lastUpdated: number }> = Object.create(null);
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-    if (raw && typeof raw === "object") {
-      Object.assign(syncStore, raw);
-    }
-  } catch (e) {
-    console.error("Error reading sync store:", e);
-  }
-}
-
-const SAFE_CODE_REGEX = /^[A-Z0-9_-]{3,24}$/;
-function isSafeCode(code: string): boolean {
-  if (!code || !SAFE_CODE_REGEX.test(code)) return false;
-  if (code === "__PROTO__" || code === "CONSTRUCTOR" || code === "PROTOTYPE") return false;
-  return true;
-}
-
-let affiliateStore: { partnerTag: string; customUrls: Record<string, string> } = {
-  partnerTag: "31212",
-  customUrls: {},
+const KICK_HEADERS = {
+  "Accept": "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 };
-if (fs.existsSync(AFFILIATE_FILE)) {
+
+// Proxy for Kick Channel API
+app.get("/api/kick-channel/v2/channels/:slug", async (req, res) => {
+  const { slug } = req.params;
   try {
-    affiliateStore = JSON.parse(fs.readFileSync(AFFILIATE_FILE, "utf-8"));
-  } catch (e) {
-    console.error("Error reading affiliate store:", e);
-  }
-}
+    const cleanSlug = slug.trim().toLowerCase().replace(/^https?:\/\/kick\.com\//, '').replace(/\//g, '');
+    const kickRes = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}`, {
+      headers: KICK_HEADERS,
+    });
 
-function persistSyncStore() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(syncStore, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving sync store:", e);
-  }
-}
-
-function persistAffiliateStore() {
-  try {
-    fs.writeFileSync(AFFILIATE_FILE, JSON.stringify(affiliateStore, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Error saving affiliate store:", e);
-  }
-}
-
-// Health check endpoint
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Affiliate Config Endpoints (for monetization)
-app.get("/api/affiliate-config", (_req, res) => {
-  res.json(affiliateStore);
-});
-
-app.post("/api/admin/affiliate-config", (req, res) => {
-  const { partnerTag, customUrls } = req.body;
-  if (partnerTag !== undefined) {
-    affiliateStore.partnerTag = String(partnerTag).trim();
-  }
-  if (customUrls && typeof customUrls === "object") {
-    affiliateStore.customUrls = { ...affiliateStore.customUrls, ...customUrls };
-  }
-  persistAffiliateStore();
-  res.json({ success: true, affiliateStore });
-});
-
-// Global Avatar Upload Endpoint (writes to public/ for all users)
-app.post("/api/admin/avatar", (req, res) => {
-  try {
-    const { imageBase64 } = req.body;
-    if (!imageBase64 || typeof imageBase64 !== "string") {
-      res.status(400).json({ error: "Missing imageBase64" });
-      return;
+    if (!kickRes.ok) {
+      return res.status(kickRes.status).json({ error: `Kick returned status ${kickRes.status}` });
     }
 
-    // Extract base64 payload
-    const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    const buffer = matches ? Buffer.from(matches[2], "base64") : Buffer.from(imageBase64, "base64");
-
-    const publicDir = path.join(process.cwd(), "public");
-    const avatarsDir = path.join(publicDir, "avatars");
-
-    if (!fs.existsSync(avatarsDir)) {
-      fs.mkdirSync(avatarsDir, { recursive: true });
-    }
-
-    // Save as official brand avatars
-    fs.writeFileSync(path.join(avatarsDir, "pulsivio_official_brand.jpg"), buffer);
-    fs.writeFileSync(path.join(publicDir, "social_avatar.jpg"), buffer);
-    fs.writeFileSync(path.join(publicDir, "pulsify_avatar.png"), buffer);
-    fs.writeFileSync(path.join(publicDir, "pulsify_avatar.jpg"), buffer);
-
-    res.json({ success: true, url: `/avatars/pulsivio_official_brand.jpg?v=${Date.now()}` });
+    const data = await kickRes.json();
+    return res.json(data);
   } catch (err: any) {
-    console.error("Failed to save global avatar:", err);
-    res.status(500).json({ error: "Failed to save avatar: " + (err.message || String(err)) });
+    console.error(`Error fetching kick channel for ${slug}:`, err);
+    return res.status(500).json({ error: err.message || "Failed to fetch channel data" });
   }
 });
 
-// Sync Endpoints (Phone <-> PC)
-app.get("/api/sync/:code", (req, res) => {
-  const code = (req.params.code || "").toUpperCase().trim();
-  if (!isSafeCode(code)) {
-    res.status(400).json({ error: "Invalid sync code" });
-    return;
-  }
-  const data = syncStore[code];
-  if (!data) {
-    res.json({ measurements: null, lastUpdated: 0 });
-    return;
-  }
-  res.json({
-    measurements: data.measurements || [],
-    profile: data.profile || {},
-    lastUpdated: data.lastUpdated || 0,
-  });
-});
-
-app.post("/api/sync/:code", (req, res) => {
-  const code = (req.params.code || "").toUpperCase().trim();
-  const { measurements, profile } = req.body;
-  if (!isSafeCode(code)) {
-    res.status(400).json({ error: "Invalid sync code" });
-    return;
-  }
-
-  const now = Date.now();
-  syncStore[code] = {
-    measurements: Array.isArray(measurements) ? measurements.slice(0, 5000) : [],
-    profile: profile && typeof profile === "object" ? profile : {},
-    lastUpdated: now,
-  };
-  persistSyncStore();
-
-  res.json({
-    success: true,
-    lastUpdated: now,
-    count: syncStore[code].measurements.length,
-  });
-});
-
-// Voice / Chat Assistant Endpoint
-app.post("/api/assistant", async (req, res) => {
+// Dedicated Chatroom & Live resolver proxy (resolves real chatroom ID for any channel)
+app.get("/api/kick-chatroom/:slug", async (req, res) => {
+  const { slug } = req.params;
+  const cleanSlug = slug.trim().toLowerCase().replace(/^https?:\/\/kick\.com\//, '').replace(/\//g, '');
+  
+  // 1. Try v2 channel chatroom directly
   try {
-    const { message, language = "pl", recentReadings = [] } = req.body;
-
-    if (!message || typeof message !== "string") {
-      res.status(400).json({ error: "Missing message" });
-      return;
-    }
-
-    const ai = getGeminiClient();
-
-    // Prepare context of recent readings
-    const readingsSummary = recentReadings.slice(0, 5).map((r: any) =>
-      `${r.date || ""} ${r.time || ""}: ${r.systolic}/${r.diastolic} mmHg, puls: ${r.pulse || "b/d"}`
-    ).join("; ");
-
-    if (ai) {
-      const systemInstruction = `Nazywasz się Pulsi — jesteś życzliwym, mądrym i przede wszystkim BEZPIECZNYM asystentem zdrowia w aplikacji Pulsivio. Twoje imię to Pulsi (krótkie, miłe i łatwe do wymówienia).
-Odpowiadaj ZAWSZE w języku użytkownika (${language}). Gdy użytkownik wita się z Tobą lub po prostu rozmawia, odpowiadaj serdecznie jako Pulsi!
-
-BEZWZGLĘDNY ZAKAZ UDZIELANIA PORAD MEDYCZNYCH I DIAGNOZOWANIA:
-1. Nigdy nie diagnozuj chorób, nie interpretuj bólów, nie oceniaj stanu zdrowia i nie sugeruj leków ani zmiany ich dawkowania!
-2. Na wszelkie pytania medyczne lub objawowe od razu odeślij do lekarza: "Jako asystent Pulsi nie jestem lekarzem i nie udzielam porad medycznych ani diagnoz. Wszelkie objawy i decyzje o lekach należy bezwzględnie skonsultować z lekarzem prowadzącym."
-3. Jedyne co wolno Ci podawać, to powszechnie znane normy ciśnienia (WHO/PTNT: optymalne <120/<80, prawidłowe 120-129/80-84, nadciśnienie od 140/90) oraz ogólne proste wskazówki stylu życia (np. ograniczenie soli w diecie, regularny odpoczynek, unikanie stresu, nawodnienie).
-4. W stanach alarmowych (ból w klatce, duszność, ciśnienie >=180/110) natychmiast każ wezwać pogotowie (112 lub 999).
-
-ROZPOZNAWANIE I ZAPISYWANIE POMIARÓW:
-Użytkownicy dyktują wyniki w różnych formatach, np.:
-- "129;/85/78 przed tabletkami"
-- "120 na 80 puls 72"
-- "135/85/70 po spacerze"
-- "140 90 puls 68 rano"
-Zawsze wyciągnij:
-- systolic: liczba skurczowa (np. 129)
-- diastolic: liczba rozkurczowa (np. 85)
-- pulse: tętno/puls jeśli podano (np. 78)
-- notes: dodatkowe okoliczności (np. "przed tabletkami", "po spacerze", "rano")
-
-Ostatnie pomiary użytkownika (do kontekstu): ${readingsSummary || "brak wpisów"}.
-
-Zwróć odpowiedź w formacie JSON z polami:
-- replyText: (string) krótka, zwięzła odpowiedź (np. "Zapisałem pomiar: 129/85 mmHg, puls 78 (przed tabletkami). Pamiętaj o regularnych konsultacjach z lekarzem.")
-- detectedMeasurement: (object | null) { systolic: number, diastolic: number, pulse?: number, notes?: string }`;
-
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: message,
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-          },
-        });
-
-        const rawText = response.text || "{}";
-        const parsedData = JSON.parse(rawText);
-        res.json({
-          replyText: parsedData.replyText || "Dziękuję za wiadomość.",
-          detectedMeasurement: parsedData.detectedMeasurement || null,
-        });
-        return;
-      } catch (geminiError) {
-        console.error("Gemini API error, falling back to rule-based:", geminiError);
+    const r = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}/chatroom`, { headers: KICK_HEADERS });
+    if (r.ok) {
+      const data = await r.json();
+      if (data?.id) {
+        return res.json({ chatroomId: data.id, slug: cleanSlug });
       }
     }
+  } catch (e) {}
 
-    // Fallback rule-based parsing and answers when Gemini API key is not yet set
-    const fallback = parseRuleBased(message, language);
-    res.json(fallback);
-  } catch (error: any) {
-    console.error("Error in /api/assistant:", error);
-    res.status(500).json({
-      replyText: "Przepraszam, wystąpił chwilowy błąd w komunikacji z asystentem.",
-      detectedMeasurement: null,
+  // 2. Try v2 channel full data
+  try {
+    const r = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}`, { headers: KICK_HEADERS });
+    if (r.ok) {
+      const data = await r.json();
+      const chatroomId = data?.chatroom?.id || data?.id;
+      if (chatroomId) {
+        return res.json({ 
+          chatroomId, 
+          slug: cleanSlug, 
+          isLive: data?.livestream?.is_live ?? !!data?.livestream,
+          viewerCount: data?.livestream?.viewer_count || 0 
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 3. Try v1 channel
+  try {
+    const r = await fetch(`https://kick.com/api/v1/channels/${encodeURIComponent(cleanSlug)}`, { headers: KICK_HEADERS });
+    if (r.ok) {
+      const data = await r.json();
+      const chatroomId = data?.chatroom?.id || data?.chatroom_id || data?.id;
+      if (chatroomId) {
+        return res.json({ 
+          chatroomId, 
+          slug: cleanSlug, 
+          isLive: data?.livestream?.is_live ?? !!data?.livestream,
+          viewerCount: data?.livestream?.viewer_count || 0 
+        });
+      }
+    }
+  } catch (e) {}
+
+  return res.status(404).json({ error: `Could not find chatroom for ${cleanSlug}` });
+});
+
+// Proxy for Kick Realtime Auth Token
+app.post("/api/kick-web/v1/realtime/auth/connection", async (req, res) => {
+  try {
+    const clientId = req.body?.client_id || `client-${Math.random().toString(36).substring(2, 12)}`;
+    const authRes = await fetch("https://web.kick.com/api/v1/realtime/auth/connection", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Referer": "https://kick.com/",
+      },
+      body: JSON.stringify({ client_id: clientId }),
     });
+
+    if (!authRes.ok) {
+      return res.status(authRes.status).json({ error: `Kick auth returned status ${authRes.status}` });
+    }
+
+    const data = await authRes.json();
+    return res.json(data);
+  } catch (err: any) {
+    console.error("Error fetching kick realtime auth:", err);
+    return res.status(500).json({ error: err.message || "Failed to fetch realtime auth token" });
   }
 });
 
-// Rule-based fallback parser
-function parseRuleBased(text: string, lang: string) {
-  const clean = text.trim();
-  const lower = clean.toLowerCase();
-  
-  // Try pattern 1: Three values with delimiters like: "129;/85/78 przed tabletkami", "120/80/72", "125-82-70"
-  const threePartMatch = clean.match(/(\d{2,3})\s*(?:;|\/|na|-|\s)+\s*(\d{2,3})\s*(?:;|\/|na|-|\s)+\s*(\d{2,3})/i);
-  // Try pattern 2: Standard two values "120 na 80", "120/80", "120 80", with pulse
-  const bpMatch = clean.match(/(\d{2,3})\s*(?:na|\/|przez|-|;|\s)\s*(\d{2,3})/i);
-  const pulseMatch = clean.match(/(?:puls|tętno|tętna|heart rate|puls:|hr)\s*[:=]?\s*(\d{2,3})/i) ||
-                     clean.match(/(\d{2,3})\s*(?:uderzeń|bpm|puls|tętno)/i);
-
-  let detectedMeasurement = null;
-
-  if (threePartMatch) {
-    const sys = parseInt(threePartMatch[1], 10);
-    const dia = parseInt(threePartMatch[2], 10);
-    const pulse = parseInt(threePartMatch[3], 10);
-    if (sys >= 50 && sys <= 260 && dia >= 30 && dia <= 160) {
-      let notes = clean.replace(threePartMatch[0], '').trim();
-      notes = notes.replace(/^(?:ciśnienie|cisnienie|puls|tętno|wynik|pomiar|zapisz|wpisz)[:\s,]*/i, '').trim();
-      detectedMeasurement = {
-        systolic: sys,
-        diastolic: dia,
-        pulse: pulse >= 30 && pulse <= 250 ? pulse : undefined,
-        notes: notes || "Wprowadzone głosowo",
-      };
-    }
-  } else if (bpMatch) {
-    const sys = parseInt(bpMatch[1], 10);
-    const dia = parseInt(bpMatch[2], 10);
-    if (sys >= 50 && sys <= 260 && dia >= 30 && dia <= 160) {
-      let notes = clean.replace(bpMatch[0], '');
-      if (pulseMatch) notes = notes.replace(pulseMatch[0], '');
-      notes = notes.replace(/^(?:ciśnienie|cisnienie|puls|tętno|wynik|pomiar|zapisz|wpisz)[:\s,]*/i, '').trim();
-      detectedMeasurement = {
-        systolic: sys,
-        diastolic: dia,
-        pulse: pulseMatch ? parseInt(pulseMatch[1], 10) : undefined,
-        notes: notes || "Wprowadzone głosowo",
-      };
-    }
-  }
-
-  const greetings = {
-    pl: "Dzień dobry! Słucham Cię. Możesz podyktować swój wynik (np. '129;/85/78 przed tabletkami' albo '120 na 80 puls 70') lub zapytać o normy ciśnienia.",
-    en: "Hello! I am listening. You can dictate your reading (e.g. '120/80/70' or '120 over 80') or ask about blood pressure ranges.",
-    de: "Guten Tag! Ich höre zu. Sie können Ihren Messwert diktieren, z. B. '120 zu 80 Puls 70'.",
-    es: "¡Hola! Te escucho. Puedes dictar tu lectura, por ejemplo '120 sobre 80 pulso 70'.",
-    fr: "Bonjour ! Je vous écoute. Vous pouvez dicter votre mesure, par exemple '120 sur 80 pouls 70'.",
-    pt: "Olá! Estou ouvindo. Você pode ditar sua medição, por exemplo '120 por 80 pulso 70'.",
-    ru: "Здравствуйте! Я слушаю. Вы можете продиктовать свои показатели, например: '120 на 80 пульс 70'.",
-  };
-
-  if (detectedMeasurement) {
-    const noteText = detectedMeasurement.notes && detectedMeasurement.notes !== "Wprowadzone głosowo" ? ` (${detectedMeasurement.notes})` : "";
-    const msg = {
-      pl: `Rozpoznałem pomiar: Ciśnienie ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, puls: ${detectedMeasurement.pulse}` : ""}${noteText}. Zapisać go w Twoim dzienniku?`,
-      en: `I recognized the measurement: Blood pressure ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulse: ${detectedMeasurement.pulse}` : ""}${noteText}. Would you like to save it?`,
-      de: `Messung erkannt: Blutdruck ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, Puls: ${detectedMeasurement.pulse}` : ""}.`,
-      es: `Medición reconocida: Presión arterial ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulso: ${detectedMeasurement.pulse}` : ""}.`,
-      fr: `Mesure reconnue : Tension ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pouls : ${detectedMeasurement.pulse}` : ""}. Voulez-vous l'enregistrer ?`,
-      pt: `Medição reconhecida: Pressão ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} mmHg${detectedMeasurement.pulse ? `, pulso: ${detectedMeasurement.pulse}` : ""}. Deseja salvar?`,
-      ru: `Распознано измерение: Давление ${detectedMeasurement.systolic}/${detectedMeasurement.diastolic} мм рт. ст.${detectedMeasurement.pulse ? `, пульс: ${detectedMeasurement.pulse}` : ""}. Сохранить в дневник?`,
-    };
-    return {
-      replyText: (msg as any)[lang] || msg.pl,
-      detectedMeasurement,
-    };
-  }
-
-  // Difficult questions: medical advice, drugs, diagnostics, symptoms -> strict referral to doctor
-  if (
-    lower.includes("lek") ||
-    lower.includes("tablet") ||
-    lower.includes("dawk") ||
-    lower.includes("zawał") ||
-    lower.includes("zawal") ||
-    lower.includes("ból") ||
-    lower.includes("bol") ||
-    lower.includes("kłucie") ||
-    lower.includes("klucie") ||
-    lower.includes("duszno") ||
-    lower.includes("diagnoz") ||
-    lower.includes("leczyć") ||
-    lower.includes("leczyc") ||
-    lower.includes("recept") ||
-    lower.includes("doktor") ||
-    lower.includes("lekarz") ||
-    lower.includes("choro")
-  ) {
-    const medNotice = {
-      pl: "Jako asystent cyfrowy nie jestem lekarzem i nie udzielam porad medycznych, nie stawiam diagnoz ani nie doradzam w kwestii doboru czy dawkowania leków. Wszelkie niepokojące objawy oraz kwestie leczenia należy bezwzględnie skonsultować z lekarzem prowadzącym. W stanach nagłego zagrożenia dzwoń natychmiast pod 112 lub 999.",
-      en: "As a digital assistant, I am not a doctor. I cannot diagnose conditions or advise on medication doses. Please consult all symptoms and treatment decisions with your physician. In an emergency, call 112 or 911.",
-    };
-    return {
-      replyText: (medNotice as any)[lang] || medNotice.pl,
-      detectedMeasurement: null,
-    };
-  }
-
-  // How to measure blood pressure
-  if (lower.includes("jak mierzy") || lower.includes("jak zbad") || lower.includes("zasad") || lower.includes("przygotow")) {
-    const guide = {
-      pl: "Zasady prawidłowego pomiaru: 1. Odpocznij 5 minut w ciszy przed badaniem. 2. Siedź z podpartymi plecami i obiema stopami na podłodze. 3. Mankiet załóż na ramię na wysokości serca. 4. Nie pij kawy ani nie pal 30 min przed pomiarem. 5. Nie ruszaj się i nie rozmawiaj w trakcie pomiaru.",
-      en: "Measurement tips: 1. Rest quietly for 5 minutes. 2. Sit with back supported and feet flat on floor. 3. Keep cuff on upper arm at heart level. 4. Avoid caffeine and smoking 30 min prior. 5. Do not talk during the reading.",
-    };
-    return {
-      replyText: (guide as any)[lang] || guide.pl,
-      detectedMeasurement: null,
-    };
-  }
-
-  // Common questions: blood pressure and pulse norms
-  if (lower.includes("norm") || lower.includes("prawidłow") || lower.includes("prawidlow") || lower.includes("optymal") || lower.includes("норм") || lower.includes("puls") || lower.includes("tętn")) {
-    const norms = {
-      pl: "Normy ciśnienia (WHO/PTNT): Optymalne: poniżej 120/80 mmHg. Prawidłowe: 120-129 / 80-84 mmHg. Wysokie prawidłowe: 130-139 / 85-89 mmHg. Nadciśnienie 1. stopnia: 140-159 / 90-99 mmHg. Prawidłowy spoczynkowy puls to 60-100 uderzeń na minutę.",
-      en: "Blood pressure ranges (WHO): Optimal: under 120/80 mmHg. Normal: 120-129 / 80-84 mmHg. High-normal: 130-139 / 85-89 mmHg. Stage 1 hypertension: 140-159 / 90-99 mmHg. Normal resting pulse is 60-100 bpm.",
-      de: "Optimaler Blutdruck liegt unter 120/80 mmHg. Normalwert ist 120-129 / 80-84 mmHg. Ruhepuls: 60-100 Schläge pro Minute.",
-      es: "La presión óptima es inferior a 120/80 mmHg. Normal es 120-129 / 80-84 mmHg. El pulso en reposo normal es de 60-100 lpm.",
-      fr: "La tension optimale est inférieure à 120/80 mmHg. La tension normale se situe entre 120-129 / 80-84 mmHg. Le pouls normal au repos est de 60 à 100 bpm.",
-      pt: "A pressão ideal é inferior a 120/80 mmHg. Normal é 120-129 / 80-84 mmHg. O pulso normal em repouso é de 60 a 100 bpm.",
-      ru: "Оптимальное давление — ниже 120/80 мм рт. ст. Нормальное: 120-129 / 80-84 мм рт. ст. Высокое нормальное: 130-139 / 85-89 мм рт. ст. Гипертония диагностируется от 140/90 мм рт. ст.",
-    };
-    return {
-      replyText: (norms as any)[lang] || norms.pl,
-      detectedMeasurement: null,
-    };
-  }
-
-  return {
-    replyText: (greetings as any)[lang] || greetings.pl,
-    detectedMeasurement: null,
-  };
-}
-
-// Serve public assets explicitly
-app.use(express.static(path.join(process.cwd(), "public")));
-
-// Vite & Static serving setup
-async function startServer() {
+// Serve frontend: in dev use Vite middleware, in prod serve dist
+async function start() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -412,14 +139,14 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
+    app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`KardioDziennik Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+start();

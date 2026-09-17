@@ -1,134 +1,75 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @layer base {
-  html.large-font {
-    font-size: 114%;
+  *, *::before, *::after {
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
   }
-
-  /* Universal scrollbar hiding while preserving natural touch and mouse wheel scrolling */
-  * {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  input, textarea {
+    -webkit-user-select: auto;
+    -moz-user-select: auto;
+    -ms-user-select: auto;
+    user-select: auto;
   }
-  *::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-  }
-
-  html {
-    font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    -webkit-tap-highlight-color: transparent;
-    overflow-x: hidden;
-    width: 100%;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-  }
-
   body {
-    overflow-x: hidden;
-    width: 100%;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: "cv05" 0, "zero" 0;
+    font-variant-numeric: normal tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* Prevent iOS Safari from jerky auto-zoom on input focus */
-  @media screen and (max-width: 768px) {
-    input, select, textarea {
-      font-size: 16px !important;
-    }
-  }
-
-  /* Faster mobile responsiveness without double-tap delay */
-  button, a {
-    touch-action: manipulation;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera, and Firefox */
-.no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+/* OBS Panel & Overlay Optimizations */
+html, body {
+  background-color: #0b0e14;
 }
+
+/* Hardware accelerated layer for zero lag in OBS */
+.obs-dock-container {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* OBS Overlay Transparent Canvas Mode */
+html.obs-transparent,
+body.obs-transparent,
+#root.obs-transparent {
+  background-color: transparent !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+/* Thin clean scrollbar for OBS docks */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0e14;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Hide scrollbar when needed */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
-  width: 0;
-  height: 0;
 }
-
-/* Mobile AdSense & Playable Ad Safe-Area Fixes */
-.google-interstitial-overlay,
-ins.adsbygoogle-noablate,
-iframe[id*="google_ads_iframe"] {
-  max-width: 100vw !important;
-  box-sizing: border-box !important;
-}
-
-#mobile-ad-escape-root {
-  pointer-events: auto;
-}
-
-#mobile-ad-escape-btn-wrapper {
-  touch-action: manipulation;
-}
-
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 8mm;
-  }
-
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 11pt !important;
-  }
-
-  /* Hide all interactive web UI elements */
-  header,
-  nav,
-  aside,
-  footer,
-  button,
-  .no-print,
-  #header-add-measurement-btn,
-  .fab-btn {
-    display: none !important;
-  }
-
-  /* When printing the modal or page */
-  .printable-a4-sheet {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-
-  table {
-    border-collapse: collapse !important;
-    width: 100% !important;
-  }
-
-  th, td {
-    border: 1px solid #64748b !important;
-  }
-
-  tr {
-    page-break-inside: avoid !important;
-  }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
