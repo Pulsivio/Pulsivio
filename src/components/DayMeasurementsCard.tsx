@@ -42,7 +42,7 @@ export const DayMeasurementsCard: React.FC<DayMeasurementsCardProps> = ({
   const relativeText = isToday ? '(Dziś)' : isYesterday ? '(Wczoraj)' : '';
 
   // Sort by period order: rano, poludnie, wieczor, dodatkowy
-  const periodOrder: Record<Period, number> = {
+  const periodOrder: Record<string, number> = {
     rano: 1,
     poludnie: 2,
     wieczor: 3,
@@ -50,7 +50,7 @@ export const DayMeasurementsCard: React.FC<DayMeasurementsCardProps> = ({
   };
 
   const sorted = [...measurements].sort(
-    (a, b) => periodOrder[a.period] - periodOrder[b.period] || b.createdAt - a.createdAt
+    (a, b) => ((periodOrder[a.period] || 99) - (periodOrder[b.period] || 99)) || (b.createdAt - a.createdAt)
   );
 
   return (
@@ -111,13 +111,18 @@ export const DayMeasurementsCard: React.FC<DayMeasurementsCardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3.5">
         {sorted.map(m => {
           const ptnt = getPTNTClassification(m.systolic, m.diastolic);
-          const periodIcons: Record<Period, { icon: string; label: string; color: string; border: string }> = {
+          const periodIcons: Record<string, { icon: string; label: string; color: string; border: string }> = {
             rano: { icon: '☀️', label: 'Rano', color: 'text-amber-400', border: 'border-amber-600/30' },
             poludnie: { icon: '🌤️', label: 'Południe', color: 'text-sky-400', border: 'border-sky-600/30' },
             wieczor: { icon: '🌙', label: 'Wieczór', color: 'text-indigo-400', border: 'border-indigo-600/30' },
             dodatkowy: { icon: '➕', label: 'Dodatkowy', color: 'text-purple-400', border: 'border-purple-600/30' }
           };
-          const pInfo = periodIcons[m.period];
+          const pInfo = (m.period && periodIcons[m.period]) || {
+            icon: '❤️',
+            label: m.period || 'Pomiar',
+            color: 'text-slate-300',
+            border: 'border-slate-700/50'
+          };
 
           return (
             <div
